@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent !important;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none;
+    -webkit-app-region: drag; /* Makes the entire window draggable */
+  }
+
+  .interactive {
+    -webkit-app-region: no-drag; /* Re-enables clicking on UI controls */
+  }
+
+  /* FULL OVERLAY STATE */
+  #overlay-card {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: rgba(20, 20, 30, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 14px;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .title {
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn {
+    border: none;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    transition: background 0.2s ease;
+  }
+
+  .btn-rec {
+    background: #007aff;
+    padding: 4px 8px;
+  }
+
+  .btn-rec.recording {
+    background: #ff3b30;
+  }
+
+  .min-btn {
+    background: rgba(255, 255, 255, 0.2);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .min-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+  }
+
+  /* TRANSCRIPT STREAM AREA */
+  .transcript-box {
+    flex: 1;
+    margin-top: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+    padding: 10px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .log-entry {
+    word-break: break-word;
+  }
+
+  .speaker-you {
+    color: #4cd964;
+    font-weight: 600;
+  }
+
+  /* FLOATING DOT STATE */
+  #floating-dot {
+    width: 40px;
+    height: 40px;
+    background: #007aff;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px solid white;
+    transition: transform 0.2s ease;
+  }
+
+  #floating-dot:hover {
+    transform: scale(1.1);
+  }
+
+  /* Helper Class */
+  .hidden {
+    display: none !important;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Expanded Card View -->
+  <div id="overlay-card">
+    <div class="header">
+      <span class="title">Pinned Assistant</span>
+      <div class="header-actions">
+        <button id="btn-toggle-rec" class="btn btn-rec interactive">Start Rec</button>
+        <button class="btn min-btn interactive" id="btn-minimize" title="Minimize to Dot">—</button>
+      </div>
+    </div>
+
+    <!-- Live Speech Output Stream -->
+    <div id="transcript" class="transcript-box interactive">
+      <div style="color: #aaa; font-style: italic;">Press "Start Rec" to transcribe speech...</div>
+    </div>
+  </div>
+
+  <!-- Minimized Floating Dot View -->
+  <div id="floating-dot" class="interactive hidden" title="Click to Expand">
+    <div style="width: 10px; height: 10px; background: white; border-radius: 50%;"></div>
+  </div>
+
+  <script>
+    const overlayCard = document.getElementById('overlay-card');
+    const floatingDot = document.getElementById('floating-dot');
+    const btnMinimize = document.getElementById('btn-minimize');
+    const btnToggleRec = document.getElementById('btn-toggle-rec');
+    const transcriptBox = document.getElementById('transcript');
+
+    // 1. MINIMIZE / EXPAND TOGGLE
+    btnMinimize.addEventListener('click', () => {
+      overlayCard.classList.add('hidden');
+      floatingDot.classList.remove('hidden');
+      if (window.electronAPI && window.electronAPI.toggleOverlayMode) {
+        window.electronAPI.toggleOverlayMode(true);
+      }
+    });
+
+    floatingDot.addEventListener('click', () => {
+      floatingDot.classList.add('hidden');
+      overlayCard.classList.remove('hidden');
+      if (window.electronAPI && window.electronAPI.toggleOverlayMode) {
+        window.electronAPI.toggleOverlayMode(false);
+      }
+    });
+
+    // 2. SPEECH RECOGNITION SETUP
+    let recognition = null;
+    let isRecording = false;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      transcriptBox.innerHTML = '<span style="color: #ff3b30;">Speech Recognition not supported in this environment.</span>';
+      btnToggleRec.disabled = true;
+      btnToggleRec.style.opacity = '0.5';
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        const lastResultIndex = event.results.length - 1;
+        const text = event.results[lastResultIndex][0].transcript.trim();
+
+        if (text.length > 0) {
+          // Clear initial placeholder text on first entry
+          if (transcriptBox.querySelector('div[style*="italic"]')) {
+            transcriptBox.innerHTML = '';
+          }
+
+          // Append transcript line in UI
+          const entry = document.createElement('div');
+          entry.className = 'log-entry';
+          entry.innerHTML = `<span class="speaker-you">You:</span> ${text}`;
+          transcriptBox.appendChild(entry);
+          transcriptBox.scrollTop = transcriptBox.scrollHeight;
+
+          // Save transcript to conversation.txt via IPC
+          if (window.electronAPI && window.electronAPI.saveTranscript) {
+            window.electronAPI.saveTranscript('You', text);
+          }
+        }
+      };
+
+      recognition.onerror = (e) => {
+        console.error('Speech recognition error:', e.error);
+      };
+
+      recognition.onend = () => {
+        // Auto-restart if recording state is still active
+        if (isRecording) {
+          recognition.start();
+        }
+      };
+    }
+
+    // Toggle recording listener
+    btnToggleRec.addEventListener('click', () => {
+      if (!recognition) return;
+
+      if (!isRecording) {
+        recognition.start();
+        isRecording = true;
+        btnToggleRec.innerText = 'Stop';
+        btnToggleRec.classList.add('recording');
+      } else {
+        isRecording = false;
+        recognition.stop();
+        btnToggleRec.innerText = 'Start Rec';
+        btnToggleRec.classList.remove('recording');
+      }
+    });
+  </script>
+</body>
+</html>
