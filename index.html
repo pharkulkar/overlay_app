@@ -1,258 +1,913 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Assistant Overlay</title>
 <style>
+  * , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
   html, body {
-    margin: 0;
-    padding: 0;
+    width: 100%; height: 100%; overflow: hidden;
     background: transparent !important;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    user-select: none;
-    -webkit-app-region: drag; /* Makes the entire window draggable */
+    user-select: none; -webkit-user-select: none;
+    -webkit-app-region: drag; /* window draggable; interactive bits opt out */
+  }
+  .interactive { -webkit-app-region: no-drag; }
+  /* Interactive content areas must opt out of window-drag so clicks/scroll work. */
+  #gallery-grid, .g-item, .g-del, #answer-hero, #ocr-input, #history-list,
+  #suggestions-box, #transcript-live, select, button, textarea, input {
+    -webkit-app-region: no-drag;
   }
 
-  .interactive {
-    -webkit-app-region: no-drag; /* Re-enables clicking on UI controls */
-  }
-
-  /* FULL OVERLAY STATE */
+  /* ── Card shell ─────────────────────────────────────────── */
   #overlay-card {
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    background: rgba(20, 20, 30, 0.75);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    padding: 14px;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    width: 100%; height: 100%; box-sizing: border-box;
+    background: rgba(18, 18, 26, 0.78);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px; padding: 12px;
+    color: #e8e8ea; display: flex; flex-direction: column; gap: 10px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
   }
 
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  /* ── Header ─────────────────────────────────────────────── */
+  .header { display: flex; align-items: center; gap: 10px; }
+  .status-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: #555;
+    flex-shrink: 0; transition: background 0.2s;
+  }
+  .status-dot.idle { background: #555; }
+  .status-dot.thinking { background: #4c9aff; animation: pulse 1s infinite; }
+  .status-dot.ok { background: #4cd964; }
+  .status-dot.error { background: #ff3b30; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .title { font-size: 13px; font-weight: 600; color: #fff; letter-spacing: 0.2px; }
+  .nav { display: flex; gap: 4px; margin-left: 8px; }
+  .nav-btn {
+    border: none; color: #cfcfd4; background: transparent;
+    font-size: 12px; padding: 4px 10px; border-radius: 7px; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .nav-btn.active { background: rgba(76,154,255,0.9); color: #fff; }
+  .spacer { flex: 1; }
+  .icon-btn {
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08);
+    color: #e8e8ea; width: 24px; height: 24px; border-radius: 7px; cursor: pointer;
+    font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.16); }
+
+  /* ── Views ──────────────────────────────────────────────── */
+  .view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  .view.hidden { display: none !important; }
+
+  .zone-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #7a7f88;
   }
 
-  .title {
-    font-weight: 600;
-    font-size: 14px;
-    letter-spacing: 0.3px;
+  /* Answer hero */
+  #answer-hero {
+    flex: 1; min-height: 0; overflow-y: auto;
+    background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 14px;
+  }
+  #answer-body {
+    font-size: 15px; line-height: 1.55; color: #f2f2f4;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .muted { color: #6a6f78; font-style: italic; }
+
+  /* Editable OCR / question input */
+  #ocr-input {
+    width: 100%; min-height: 48px; max-height: 50vh; resize: vertical;
+    background: rgba(0,0,0,0.3); color: #f2f2f4;
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
+    padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.45;
+    outline: none;
+  }
+  #ocr-input:focus { border-color: rgba(76,154,255,0.6); }
+  #ocr-input::placeholder { color: #6a6f78; }
+  #ocr-input.collapsed { display: none; }
+
+  /* Actions row */
+  .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .act-btn {
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08);
+    color: #e8e8ea; font-size: 11px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+  }
+  .act-btn:hover { background: rgba(255,255,255,0.16); }
+  select.tone {
+    background: #1c1c24; color: #e8e8ea; border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 7px; font-size: 11px; padding: 4px 6px;
   }
 
-  .header-actions {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
+  /* Gallery */
+  #gallery-grid { flex: 1; min-height: 0; overflow-y: auto;
+    background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 10px; }
+  .day-head { font-size: 10px; color: #6a6f78; text-transform: uppercase;
+    letter-spacing: 0.08em; margin: 10px 0 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+  .g-item { position: relative; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; overflow: hidden; cursor: pointer; background: #111; }
+  .g-item:hover { border-color: rgba(255,255,255,0.3); }
+  .g-item img { width: 100%; height: 58px; object-fit: cover; display: block; }
+  .g-audio { width: 100%; height: 58px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .g-text { width: 100%; height: 58px; padding: 6px 7px; font-size: 10px; line-height: 1.3;
+    color: #cfd6e2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical; }
+  .g-badge { position: absolute; top: 3px; left: 3px; font-size: 11px;
+    background: rgba(0,0,0,0.65); border-radius: 4px; padding: 0 4px; }
+  .g-del { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #fff;
+    background: rgba(163,21,21,0.8); border-radius: 4px; padding: 0 5px; cursor: pointer; }
 
-  .btn {
-    border: none;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 500;
-    transition: background 0.2s ease;
-  }
+  /* Audio capture meters */
+  #view-audio .pad { flex: 1; display: flex; align-items: center; justify-content: center;
+    color: #6a6f78; font-size: 13px; text-align: center; line-height: 1.6; }
+  .meter { width: 100%; height: 10px; background: rgba(255,255,255,0.08);
+    border-radius: 6px; overflow: hidden; }
+  .meter-fill { height: 100%; width: 0%; background: #4cd964; border-radius: 6px;
+    transition: width 0.06s linear; }
+  .meter-fill.them { background: #4c9aff; }
+  /* Compact inline meters in the audio controls row */
+  .meter.mini { display: inline-block; width: 48px; height: 8px; vertical-align: middle; }
+  .meter.mini .meter-fill { display: block; }
 
-  .btn-rec {
-    background: #007aff;
-    padding: 4px 8px;
-  }
-
-  .btn-rec.recording {
-    background: #ff3b30;
-  }
-
-  .min-btn {
-    background: rgba(255, 255, 255, 0.2);
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .min-btn:hover {
-    background: rgba(255, 255, 255, 0.35);
-  }
-
-  /* TRANSCRIPT STREAM AREA */
-  .transcript-box {
-    flex: 1;
-    margin-top: 10px;
-    background: rgba(0, 0, 0, 0.25);
-    border-radius: 8px;
-    padding: 10px;
-    overflow-y: auto;
-    font-size: 12px;
-    line-height: 1.4;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .log-entry {
-    word-break: break-word;
-  }
-
-  .speaker-you {
-    color: #4cd964;
-    font-weight: 600;
-  }
-
-  /* FLOATING DOT STATE */
+  /* Floating dot (S0) — clickable (no-drag) so expand works. */
   #floating-dot {
-    width: 40px;
-    height: 40px;
-    background: #007aff;
-    border-radius: 50%;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border: 2px solid white;
-    transition: transform 0.2s ease;
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-app-region: no-drag;
   }
+  #floating-dot .dot {
+    width: 36px; height: 36px; border-radius: 50%; background: #4c9aff;
+    border: 2px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  .hidden { display: none !important; }
 
-  #floating-dot:hover {
-    transform: scale(1.1);
+  /* In-overlay context menu (stays inside the content-protected window) */
+  #ctx-menu {
+    position: fixed; z-index: 1000; min-width: 160px;
+    background: rgba(28,28,36,0.98); border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    -webkit-app-region: no-drag;
   }
+  #ctx-menu .ctx-item {
+    padding: 7px 12px; font-size: 13px; color: #e8e8ea; border-radius: 5px;
+    cursor: pointer; white-space: nowrap;
+  }
+  #ctx-menu .ctx-item:hover { background: rgba(76,154,255,0.9); color: #fff; }
+  #ctx-menu .ctx-sep { height: 1px; background: rgba(255,255,255,0.12); margin: 4px 6px; }
 
-  /* Helper Class */
-  .hidden {
-    display: none !important;
-  }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 </style>
 </head>
 <body>
 
-  <!-- Expanded Card View -->
-  <div id="overlay-card">
-    <div class="header">
-      <span class="title">Pinned Assistant</span>
-      <div class="header-actions">
-        <button id="btn-toggle-rec" class="btn btn-rec interactive">Start Rec</button>
-        <button class="btn min-btn interactive" id="btn-minimize" title="Minimize to Dot">—</button>
+<!-- Expanded card (S1/S2/S3) -->
+<div id="overlay-card">
+  <div class="header interactive">
+    <span class="status-dot idle" id="status-dot"></span>
+    <span class="title">Assistant</span>
+    <div class="nav">
+      <button class="nav-btn active" id="nav-answer">Answer</button>
+      <button class="nav-btn" id="nav-gallery">Gallery</button>
+      <button class="nav-btn" id="nav-audio">Audio</button>
+    </div>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="btn-minimize" title="Minimize to dot">—</button>
+  </div>
+
+  <!-- One-time consent / privacy notice (dismissed flag in localStorage) -->
+  <div id="consent" class="interactive hidden" style="background:rgba(76,154,255,0.12);
+       border:1px solid rgba(76,154,255,0.4); border-radius:10px; padding:10px 12px; font-size:11px; color:#cfd6e2;">
+    This assistant can listen to meeting audio (your mic and system output) to
+    suggest replies. Audio is processed to produce text; the live transcript is
+    kept in memory only and is <b>not saved</b> unless you choose "Save".
+    Recording others may require their consent depending on your location.
+    <div style="margin-top:8px; text-align:right;">
+      <button class="act-btn" id="consent-ok">Got it</button>
+    </div>
+  </div>
+
+  <!-- S1: Answer -->
+  <div class="view" id="view-answer">
+    <!-- Editable extracted text (OCR) -> edit -> Ask -->
+    <div class="zone-label interactive" id="input-toggle" style="cursor:pointer; display:flex; align-items:center; gap:6px;">
+      <span id="input-caret">▾</span> Extracted text (edit, then Ask)
+    </div>
+    <textarea id="ocr-input" class="interactive" placeholder="Capture the screen (⌘⇧1 full · ⌘⇧2 region) — the extracted text appears here to edit, or type your own question."></textarea>
+    <div class="actions interactive">
+      <button class="act-btn" id="btn-ask" title="Ask OpenAI with the text above">➤ Ask</button>
+      <button class="act-btn" id="btn-clear-input" title="Clear the text box">Clear</button>
+      <span class="spacer"></span>
+      <span class="zone-label">Tone</span>
+      <select class="tone" id="tone-select">
+        <option value="concise">Concise</option>
+        <option value="detailed">Detailed</option>
+        <option value="professional">Professional</option>
+        <option value="casual">Casual</option>
+      </select>
+    </div>
+
+    <!-- Answer -->
+    <div class="zone-label" id="answer-status" style="margin-top:4px;">Answer</div>
+    <div id="answer-hero">
+      <div id="answer-body"><span class="muted">The answer will appear here after you press Ask.</span></div>
+    </div>
+    <div class="actions interactive">
+      <button class="act-btn" id="btn-regenerate" title="Re-ask with the current text + tone">↻ Regenerate</button>
+      <button class="act-btn" id="btn-copy">⧉ Copy answer</button>
+    </div>
+
+    <!-- Previous answers for this record (newest first) -->
+    <div id="history-wrap" class="interactive hidden">
+      <div id="history-toggle" class="zone-label" style="cursor:pointer;"><span id="history-caret">▸</span> <span id="history-count">History</span></div>
+      <div id="history-list" class="hidden" style="margin-top:6px; max-height:140px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- S2: Gallery -->
+  <div class="view hidden" id="view-gallery">
+    <div class="actions interactive">
+      <span class="zone-label">History</span>
+      <span class="spacer"></span>
+      <button class="act-btn" id="gallery-refresh">↻ Refresh</button>
+      <button class="act-btn" id="gallery-clear">Clear</button>
+    </div>
+    <div id="gallery-grid" class="interactive"><div class="muted">Loading…</div></div>
+  </div>
+
+  <!-- S3: Audio copilot — transcript-first (select text -> right-click -> Ask). -->
+  <div class="view hidden" id="view-audio">
+    <!-- Compact capture controls -->
+    <div class="actions interactive" style="flex-wrap:wrap;">
+      <button class="act-btn" id="audio-toggle">● Start</button>
+      <label style="font-size:11px; color:#cfcfd4; display:flex; align-items:center; gap:5px;">
+        <input type="checkbox" id="transcribe-toggle" checked /> Transcribe
+      </label>
+      <span class="meter mini"><span class="meter-fill" id="meter-me"></span></span>
+      <span class="meter mini"><span class="meter-fill them" id="meter-them"></span></span>
+      <span class="spacer"></span>
+      <button class="act-btn" id="audio-devices-toggle" title="Device settings">⚙︎</button>
+      <button class="act-btn" id="btn-ask-now" title="Ask about the latest (⌘⇧A)">💡 Ask latest</button>
+    </div>
+
+    <!-- Device settings (collapsed by default) -->
+    <div id="audio-devices" class="interactive hidden" style="display:flex; flex-direction:column; gap:6px; background:rgba(0,0,0,0.2); border-radius:8px; padding:8px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="zone-label" style="color:#4cd964; min-width:46px;">Me</span>
+        <select class="tone interactive" id="dev-me" style="flex:1;"></select>
       </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="zone-label" style="color:#4c9aff; min-width:46px;">Them</span>
+        <select class="tone interactive" id="dev-them" style="flex:1;"></select>
+      </div>
+      <button class="act-btn" id="audio-refresh" title="Re-scan devices" style="align-self:flex-start;">↻ Rescan devices</button>
     </div>
 
-    <!-- Live Speech Output Stream -->
-    <div id="transcript" class="transcript-box interactive">
-      <div style="color: #aaa; font-style: italic;">Press "Start Rec" to transcribe speech...</div>
+    <!-- Live transcript — the hero. Select text, right-click, Ask. -->
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="zone-label">Live transcript — select text, right-click → Ask</span>
+      <span class="spacer"></span>
+      <button class="act-btn" id="transcript-save" title="Opt-in: write transcript to disk">💾</button>
+      <button class="act-btn" id="transcript-clear" title="Clear transcript">Clear</button>
+    </div>
+    <div id="transcript-live" class="interactive" style="flex:1; min-height:140px; overflow-y:auto;
+         background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08);
+         border-radius:10px; padding:12px; font-size:13px; line-height:1.55; user-select:text; cursor:text;">
+      <span class="muted">Press Start — the other person's speech appears here. Select any text and right-click to Ask.</span>
+    </div>
+
+    <div id="audio-status" class="muted" style="font-size:11px;">
+      Me = your mic, Them = system audio (BlackHole via a Multi-Output Device).
+    </div>
+
+    <!-- Suggestions (demoted; auto off by default) -->
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span class="zone-label">Suggestions</span>
+      <label style="font-size:11px; color:#cfcfd4; display:flex; align-items:center; gap:5px;" class="interactive">
+        <input type="checkbox" id="auto-suggest-toggle" /> Auto on pause
+      </label>
+    </div>
+    <div id="suggestions-box" class="interactive" style="min-height:40px; max-height:120px; overflow-y:auto;
+         background:rgba(0,0,0,0.22); border:1px solid rgba(255,255,255,0.06);
+         border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+      <span class="muted">Select transcript text → right-click → Ask, or press "Ask latest".</span>
     </div>
   </div>
+</div>
 
-  <!-- Minimized Floating Dot View -->
-  <div id="floating-dot" class="interactive hidden" title="Click to Expand">
-    <div style="width: 10px; height: 10px; background: white; border-radius: 50%;"></div>
-  </div>
+<!-- In-overlay right-click menu for transcript selection (content-protected) -->
+<div id="ctx-menu" class="hidden interactive">
+  <div class="ctx-item" data-action="ask">⚡ Ask</div>
+  <div class="ctx-item" data-action="ask-context">💬 Ask with context</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" data-action="copy">⧉ Copy</div>
+</div>
 
-  <script>
-    const overlayCard = document.getElementById('overlay-card');
-    const floatingDot = document.getElementById('floating-dot');
-    const btnMinimize = document.getElementById('btn-minimize');
-    const btnToggleRec = document.getElementById('btn-toggle-rec');
-    const transcriptBox = document.getElementById('transcript');
+<!-- Floating dot (S0) -->
+<div id="floating-dot" class="hidden" title="Click to expand">
+  <div class="dot"></div>
+</div>
 
-    // 1. MINIMIZE / EXPAND TOGGLE
-    btnMinimize.addEventListener('click', () => {
-      overlayCard.classList.add('hidden');
-      floatingDot.classList.remove('hidden');
-      if (window.electronAPI && window.electronAPI.toggleOverlayMode) {
-        window.electronAPI.toggleOverlayMode(true);
-      }
+<script src="audio.js"></script>
+<script>
+  const api = window.electronAPI || {};
+
+  // ── Elements ────────────────────────────────────────────
+  const overlayCard = document.getElementById('overlay-card');
+  const floatingDot = document.getElementById('floating-dot');
+  const statusDot = document.getElementById('status-dot');
+  const answerStatus = document.getElementById('answer-status');
+  const answerBody = document.getElementById('answer-body');
+  const ocrInput = document.getElementById('ocr-input');
+  const toneSelect = document.getElementById('tone-select');
+  const historyWrap = document.getElementById('history-wrap');
+  const historyList = document.getElementById('history-list');
+  const historyCount = document.getElementById('history-count');
+  const historyCaret = document.getElementById('history-caret');
+
+  function esc(s) {
+    return (s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  }
+
+  // Render the previous Q/A for a record (newest first). Hidden if <2 entries,
+  // since the latest answer is already shown in the main answer box.
+  function renderHistory(history) {
+    const items = history || [];
+    if (items.length < 2) { historyWrap.classList.add('hidden'); historyList.innerHTML = ''; return; }
+    historyWrap.classList.remove('hidden');
+    historyCount.textContent = `History (${items.length})`;
+    // Skip the first (latest) — it's already in the answer box.
+    historyList.innerHTML = items.slice(1).map((h) => `
+      <div style="border-left:2px solid rgba(255,255,255,0.15); padding-left:8px;">
+        <div style="font-size:10px; color:#7a7f88;">Q: ${esc(h.question).slice(0, 120)}</div>
+        <div style="font-size:12px; color:#cfd6e2; white-space:pre-wrap;">${esc(h.answer)}</div>
+      </div>`).join('');
+  }
+
+  document.getElementById('history-toggle').addEventListener('click', () => {
+    const hidden = historyList.classList.toggle('hidden');
+    historyCaret.textContent = hidden ? '▸' : '▾';
+  });
+
+  const views = {
+    answer: document.getElementById('view-answer'),
+    gallery: document.getElementById('view-gallery'),
+    audio: document.getElementById('view-audio'),
+  };
+  const navs = {
+    answer: document.getElementById('nav-answer'),
+    gallery: document.getElementById('nav-gallery'),
+    audio: document.getElementById('nav-audio'),
+  };
+
+  // Current record in the answer view (for regenerate).
+  let activeRecordId = null;
+
+  // One-time consent notice (dismissal remembered locally).
+  const consentEl = document.getElementById('consent');
+  try {
+    if (!localStorage.getItem('consentDismissed')) consentEl.classList.remove('hidden');
+  } catch (_) { consentEl.classList.remove('hidden'); }
+  document.getElementById('consent-ok').addEventListener('click', () => {
+    consentEl.classList.add('hidden');
+    try { localStorage.setItem('consentDismissed', '1'); } catch (_) {}
+  });
+
+  // ── Status helper ───────────────────────────────────────
+  function setStatus(label, state) {
+    answerStatus.textContent = label;
+    statusDot.className = 'status-dot ' + (state || 'idle');
+  }
+
+  // ── View switching ──────────────────────────────────────
+  function showView(which) {
+    Object.keys(views).forEach((k) => {
+      views[k].classList.toggle('hidden', k !== which);
+      navs[k].classList.toggle('active', k === which);
     });
+    if (which === 'gallery') loadGallery();
+  }
+  navs.answer.addEventListener('click', () => showView('answer'));
+  navs.gallery.addEventListener('click', () => showView('gallery'));
+  navs.audio.addEventListener('click', () => showView('audio'));
 
-    floatingDot.addEventListener('click', () => {
-      floatingDot.classList.add('hidden');
-      overlayCard.classList.remove('hidden');
-      if (window.electronAPI && window.electronAPI.toggleOverlayMode) {
-        window.electronAPI.toggleOverlayMode(false);
+  // ── Minimize / expand ───────────────────────────────────
+  document.getElementById('btn-minimize').addEventListener('click', () => {
+    overlayCard.classList.add('hidden');
+    floatingDot.classList.remove('hidden');
+    api.toggleOverlayMode && api.toggleOverlayMode(true);
+  });
+  floatingDot.addEventListener('click', () => {
+    floatingDot.classList.add('hidden');
+    overlayCard.classList.remove('hidden');
+    api.toggleOverlayMode && api.toggleOverlayMode(false);
+  });
+
+  // ── Tone ────────────────────────────────────────────────
+  toneSelect.addEventListener('change', () => {
+    api.setTone && api.setTone(toneSelect.value);
+  });
+  // Push initial tone to main.
+  api.setTone && api.setTone(toneSelect.value);
+
+  // ── Ask flow (edit OCR text -> OpenAI answer) ───────────
+  async function askCurrentText() {
+    const text = (ocrInput.value || '').trim();
+    if (!text) { setStatus('Type or capture some text first', 'error'); return; }
+    setStatus('Thinking…', 'thinking');
+    answerBody.innerHTML = '<span class="muted">Asking the assistant…</span>';
+    try {
+      const data = api.askText
+        ? await api.askText(text, toneSelect.value, activeRecordId)
+        : null;
+      if (data && data.success) {
+        setStatus('Answer', 'ok');
+        answerBody.textContent = data.answer || 'No answer returned.';
+        // Capture the record id (a manual question creates a new record).
+        if (data.record_id) activeRecordId = data.record_id;
+        // Refresh history for this record so prior answers show up.
+        if (activeRecordId && api.getRecord) {
+          try { const rr = await api.getRecord(activeRecordId); renderHistory(rr && rr.history); } catch (_) {}
+        }
+        loadGallery();
+      } else {
+        setStatus('Error', 'error');
+        answerBody.textContent = (data && data.error) || 'Ask failed.';
       }
+    } catch (_) { setStatus('Error', 'error'); answerBody.textContent = 'Backend unreachable.'; }
+  }
+
+  document.getElementById('btn-ask').addEventListener('click', askCurrentText);
+  document.getElementById('btn-regenerate').addEventListener('click', askCurrentText);
+  document.getElementById('btn-clear-input').addEventListener('click', () => {
+    ocrInput.value = '';
+    activeRecordId = null;
+    renderHistory([]);
+    answerBody.innerHTML = '<span class="muted">The answer will appear here after you press Ask.</span>';
+    setStatus('Answer', 'idle');
+    ocrInput.focus();
+  });
+  // Cmd/Ctrl+Enter in the textarea submits.
+  ocrInput.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); askCurrentText(); }
+  });
+
+  // Collapse / expand the input box (gives the answer more room).
+  document.getElementById('input-toggle').addEventListener('click', () => {
+    const collapsed = ocrInput.classList.toggle('collapsed');
+    document.getElementById('input-caret').textContent = collapsed ? '▸' : '▾';
+  });
+
+  // Copy the answer.
+  document.getElementById('btn-copy').addEventListener('click', () => {
+    const t = answerBody.textContent || '';
+    if (t) { navigator.clipboard.writeText(t); }
+  });
+
+  // ── Capture lifecycle (from main via IPC) ───────────────
+  if (api.onSolveStatus) api.onSolveStatus((p) => {
+    if (p && p.status === 'ocr') {
+      showView('answer');
+      setStatus('Reading screen…', 'thinking');
+      ocrInput.value = '';
+      answerBody.innerHTML = '<span class="muted">Extracting text from the capture…</span>';
+    }
+  });
+  // OCR finished: fill the editable box; user reviews/edits, then Ask.
+  if (api.onOcrReady) api.onOcrReady((p) => {
+    activeRecordId = (p && p.recordId) || null;
+    renderHistory([]);
+    ocrInput.value = (p && p.text) || '';
+    setStatus(ocrInput.value ? 'Edit the text, then press Ask' : 'No text detected — type your question', ocrInput.value ? 'idle' : 'error');
+    answerBody.innerHTML = '<span class="muted">Review the extracted text above, then press ➤ Ask.</span>';
+    ocrInput.focus();
+  });
+  if (api.onSolveError) api.onSolveError((p) => {
+    setStatus('Error', 'error');
+    answerBody.textContent = (p && p.error) || 'Something went wrong.';
+  });
+
+  // ── Gallery ─────────────────────────────────────────────
+  const galleryGrid = document.getElementById('gallery-grid');
+  document.getElementById('gallery-refresh').addEventListener('click', loadGallery);
+  document.getElementById('gallery-clear').addEventListener('click', async () => {
+    if (!api.clearRecords) return;
+    if (!confirm('Clear all history? (Records removed; images on disk kept.)')) return;
+    await api.clearRecords();
+    loadGallery();
+  });
+
+  function dayLabel(ts) {
+    try { return new Date(ts * 1000).toISOString().slice(0, 10); } catch (_) { return 'unknown'; }
+  }
+
+  async function loadGallery() {
+    if (!api.listRecords) { galleryGrid.innerHTML = '<span class="muted">Backend unavailable.</span>'; return; }
+    galleryGrid.innerHTML = '<div class="muted">Loading…</div>';
+    let data;
+    try { data = await api.listRecords(); }
+    catch (_) { galleryGrid.innerHTML = '<span class="muted">Could not reach backend.</span>'; return; }
+
+    const records = (data && data.records) || [];
+    if (!records.length) {
+      galleryGrid.innerHTML = '<div class="muted">No captures yet. Press ⌘⇧1 / ⌘⇧2 to capture.</div>';
+      return;
+    }
+    const groups = {};
+    for (const r of records) { const d = dayLabel(r.created_at); (groups[d] = groups[d] || []).push(r); }
+
+    let html = '';
+    for (const day of Object.keys(groups)) {
+      html += `<div class="day-head">${day}</div><div class="grid">`;
+      for (const r of groups[day]) {
+        const answered = r.status === 'answered' && r.answer;
+        const badge = answered ? '✓' : (r.status === 'error' ? '!' : '○');
+        const color = answered ? '#4cd964' : (r.status === 'error' ? '#ff3b30' : '#9a9fa8');
+        let thumb;
+        if (r.source_type === 'audio') {
+          thumb = `<div class="g-audio">🎙</div>`;
+        } else if (r.source_type === 'manual') {
+          const snippet = (r.extracted_text || 'Question')
+            .replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))
+            .slice(0, 60);
+          thumb = `<div class="g-text">💬 ${snippet}</div>`;
+        } else {
+          thumb = `<img src="${api.backendUrl}/api/records/${r.id}/thumb" onerror="this.style.display='none'"/>`;
+        }
+        html += `<div class="g-item" data-id="${r.id}">${thumb}
+          <span class="g-badge" style="color:${color}">${badge}</span>
+          <span class="g-del" data-id="${r.id}" title="Delete">×</span></div>`;
+      }
+      html += '</div>';
+    }
+    galleryGrid.innerHTML = html;
+
+    galleryGrid.querySelectorAll('.g-item').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.classList.contains('g-del')) return;
+        openRecord(el.getAttribute('data-id'));
+      });
     });
+    galleryGrid.querySelectorAll('.g-del').forEach((el) => {
+      el.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm('Delete this capture?')) return;
+        await api.deleteRecord(el.getAttribute('data-id'));
+        loadGallery();
+      });
+    });
+  }
 
-    // 2. SPEECH RECOGNITION SETUP
-    let recognition = null;
-    let isRecording = false;
+  async function openRecord(id) {
+    console.log('[openRecord] clicked id=', id, 'backend=', api.backendUrl);
+    activeRecordId = id;
+    showView('answer');
+    setStatus('Loading…', 'thinking');
+    answerBody.textContent = '';
+    ocrInput.value = '';
+    renderHistory([]);
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      transcriptBox.innerHTML = '<span style="color: #ff3b30;">Speech Recognition not supported in this environment.</span>';
-      btnToggleRec.disabled = true;
-      btnToggleRec.style.opacity = '0.5';
-    } else {
-      recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event) => {
-        const lastResultIndex = event.results.length - 1;
-        const text = event.results[lastResultIndex][0].transcript.trim();
-
-        if (text.length > 0) {
-          // Clear initial placeholder text on first entry
-          if (transcriptBox.querySelector('div[style*="italic"]')) {
-            transcriptBox.innerHTML = '';
-          }
-
-          // Append transcript line in UI
-          const entry = document.createElement('div');
-          entry.className = 'log-entry';
-          entry.innerHTML = `<span class="speaker-you">You:</span> ${text}`;
-          transcriptBox.appendChild(entry);
-          transcriptBox.scrollTop = transcriptBox.scrollHeight;
-
-          // Save transcript to conversation.txt via IPC
-          if (window.electronAPI && window.electronAPI.saveTranscript) {
-            window.electronAPI.saveTranscript('You', text);
-          }
-        }
-      };
-
-      recognition.onerror = (e) => {
-        console.error('Speech recognition error:', e.error);
-      };
-
-      recognition.onend = () => {
-        // Auto-restart if recording state is still active
-        if (isRecording) {
-          recognition.start();
-        }
-      };
+    if (!api.getRecord) {
+      console.warn('[openRecord] api.getRecord is undefined');
+      setStatus('Error', 'error');
+      answerBody.textContent = 'Internal: getRecord unavailable.';
+      return;
     }
 
-    // Toggle recording listener
-    btnToggleRec.addEventListener('click', () => {
-      if (!recognition) return;
+    let rec;
+    try {
+      rec = await api.getRecord(id);
+      console.log('[openRecord] getRecord ->', rec);
+    } catch (err) {
+      console.error('[openRecord] getRecord failed:', err);
+      setStatus('Backend offline', 'error');
+      answerBody.textContent = 'Could not reach the backend to load this record. Is the server running on ' + api.backendUrl + '?';
+      return;
+    }
 
-      if (!isRecording) {
-        recognition.start();
-        isRecording = true;
-        btnToggleRec.innerText = 'Stop';
-        btnToggleRec.classList.add('recording');
-      } else {
-        isRecording = false;
-        recognition.stop();
-        btnToggleRec.innerText = 'Start Rec';
-        btnToggleRec.classList.remove('recording');
-      }
+    if (!rec || !rec.success || !rec.record) {
+      setStatus('Not found', 'error');
+      answerBody.textContent = (rec && rec.error) || 'Record could not be loaded.';
+      return;
+    }
+
+    ocrInput.value = rec.record.extracted_text || '';
+    renderHistory(rec.history);
+
+    // Cache hit: answered -> show the LATEST stored answer instantly (no OpenAI).
+    if (rec.record.answer) {
+      setStatus(rec.cached ? 'Answer (cached)' : 'Answer', 'ok');
+      answerBody.textContent = rec.record.answer;
+      return;
+    }
+
+    // Not answered yet -> let the user review the text and press Ask.
+    setStatus('Edit the text, then press Ask', 'idle');
+    answerBody.innerHTML = '<span class="muted">Review the extracted text above, then press ➤ Ask.</span>';
+  }
+
+  // ── Audio capture (Phase 4) ─────────────────────────────
+  const devMe = document.getElementById('dev-me');
+  const devThem = document.getElementById('dev-them');
+  const meterMe = document.getElementById('meter-me');
+  const meterThem = document.getElementById('meter-them');
+  const audioToggle = document.getElementById('audio-toggle');
+  const audioRefresh = document.getElementById('audio-refresh');
+  const audioStatus = document.getElementById('audio-status');
+  let audioInited = false;
+
+  function fillDeviceSelect(sel, devices, selectedId, includeNone) {
+    sel.innerHTML = '';
+    if (includeNone) {
+      const o = document.createElement('option');
+      o.value = ''; o.textContent = '(none)';
+      sel.appendChild(o);
+    }
+    devices.forEach((d) => {
+      const o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = d.label;
+      if (d.deviceId === selectedId) o.selected = true;
+      sel.appendChild(o);
     });
-  </script>
+  }
+
+  async function initAudio() {
+    if (!window.AudioCapture) {
+      audioStatus.textContent = 'Audio module not loaded.';
+      return;
+    }
+    audioStatus.textContent = 'Requesting microphone permission…';
+    const info = await window.AudioCapture.init();
+    if (!info.granted) {
+      audioStatus.innerHTML = '<span style="color:#ff3b30;">Microphone permission denied. Grant it in System Settings → Privacy &amp; Security → Microphone.</span>';
+    }
+    fillDeviceSelect(devMe, info.devices, info.suggestedMe, false);
+    fillDeviceSelect(devThem, info.devices, info.suggestedThem, true);
+    if (!info.suggestedThem) {
+      audioStatus.innerHTML = 'No loopback device found. Install BlackHole and route output via a Multi-Output Device to capture "Them".';
+    } else if (info.granted) {
+      audioStatus.textContent = 'Ready. Press Start — both meters should move with sound.';
+    }
+    audioInited = true;
+  }
+
+  function onLevel(which, lvl) {
+    const el = which === 'me' ? meterMe : meterThem;
+    el.style.width = Math.round(lvl * 100) + '%';
+  }
+
+  // Live transcript rendering
+  const transcribeToggle = document.getElementById('transcribe-toggle');
+  const transcriptLive = document.getElementById('transcript-live');
+  const transcriptClear = document.getElementById('transcript-clear');
+  let transcriptStarted = false;
+  let transcriptMouseOver = false;
+
+  // Don't auto-scroll (which would disrupt selecting) if the user is
+  // interacting with the transcript or has text selected inside it.
+  function shouldAutoScroll() {
+    if (transcriptMouseOver) return false;
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && transcriptLive.contains(sel.anchorNode)) return false;
+    return true;
+  }
+  function maybeScroll() {
+    if (shouldAutoScroll()) transcriptLive.scrollTop = transcriptLive.scrollHeight;
+  }
+  transcriptLive.addEventListener('mouseenter', () => { transcriptMouseOver = true; });
+  transcriptLive.addEventListener('mouseleave', () => { transcriptMouseOver = false; });
+
+  function appendTranscript(payload) {
+    if (payload.error) {
+      const e = document.createElement('div');
+      e.style.color = '#ff3b30';
+      e.textContent = 'Transcription: ' + payload.error;
+      transcriptLive.appendChild(e);
+      maybeScroll();
+      return;
+    }
+    if (!transcriptStarted) { transcriptLive.innerHTML = ''; transcriptStarted = true; }
+    const line = document.createElement('div');
+    const who = payload.speaker === 'me' ? 'Me' : 'Them';
+    const color = payload.speaker === 'me' ? '#4cd964' : '#4c9aff';
+    line.innerHTML = `<span style="color:${color}; font-weight:600;">${who}:</span> ` +
+      (payload.text || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    transcriptLive.appendChild(line);
+    maybeScroll();
+  }
+
+  // Right-click inside the transcript with a selection -> IN-OVERLAY menu.
+  // (An in-page menu stays within the content-protected window, so it is NOT
+  // visible during screen sharing — unlike a native OS popup menu.)
+  const ctxMenu = document.getElementById('ctx-menu');
+  function hideCtxMenu() { ctxMenu.classList.add('hidden'); }
+
+  transcriptLive.addEventListener('contextmenu', (e) => {
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : '';
+    if (!text) return;
+    e.preventDefault();
+    ctxMenu.dataset.sel = text;
+    // Position within the window, clamped so it doesn't overflow.
+    const pad = 6;
+    let x = e.clientX, y = e.clientY;
+    ctxMenu.classList.remove('hidden');
+    const rect = ctxMenu.getBoundingClientRect();
+    if (x + rect.width + pad > window.innerWidth) x = window.innerWidth - rect.width - pad;
+    if (y + rect.height + pad > window.innerHeight) y = window.innerHeight - rect.height - pad;
+    ctxMenu.style.left = Math.max(pad, x) + 'px';
+    ctxMenu.style.top = Math.max(pad, y) + 'px';
+  });
+
+  // Dismiss the menu on any outside click / scroll / escape.
+  document.addEventListener('mousedown', (e) => { if (!ctxMenu.contains(e.target)) hideCtxMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideCtxMenu(); });
+  transcriptLive.addEventListener('scroll', hideCtxMenu);
+
+  ctxMenu.querySelectorAll('[data-action]').forEach((item) => {
+    item.addEventListener('click', () => {
+      const action = item.getAttribute('data-action');
+      const text = ctxMenu.dataset.sel || '';
+      hideCtxMenu();
+      if (!text) return;
+      if (action === 'copy') { navigator.clipboard.writeText(text); return; }
+      handleAskSelection({ text, withContext: action === 'ask-context' });
+    });
+  });
+
+  // Perform the ask with the selected transcript text.
+  async function handleAskSelection(p) {
+    const sel = (p && p.text || '').trim();
+    if (!sel) return;
+    // Optionally prepend recent transcript as context.
+    let text = sel;
+    if (p.withContext) {
+      const ctx = (transcriptLive.innerText || '').trim().slice(-1200);
+      text = `Conversation so far:\n${ctx}\n\nThe other person said: "${sel}"\nWhat should I say in response?`;
+    }
+    // Route to the Answer view and ask (saved as a record, like everything else).
+    showView('answer');
+    ocrInput.value = p.withContext ? sel : sel;
+    activeRecordId = null; // new question from the transcript
+    setStatus('Thinking…', 'thinking');
+    answerBody.innerHTML = '<span class="muted">Asking about the selected text…</span>';
+    try {
+      const data = api.askText ? await api.askText(text, toneSelect.value, null) : null;
+      if (data && data.success) {
+        setStatus('Answer', 'ok');
+        answerBody.textContent = data.answer || 'No answer returned.';
+        if (data.record_id) activeRecordId = data.record_id;
+        loadGallery();
+      } else {
+        setStatus('Error', 'error');
+        answerBody.textContent = (data && data.error) || 'Ask failed.';
+      }
+    } catch (_) { setStatus('Error', 'error'); answerBody.textContent = 'Backend unreachable.'; }
+  }
+
+  transcriptClear.addEventListener('click', async () => {
+    transcriptLive.innerHTML = '<span class="muted">Cleared.</span>';
+    transcriptStarted = false;
+    if (api.clearTranscript) { try { await api.clearTranscript(); } catch (_) {} }
+  });
+
+  const transcriptSave = document.getElementById('transcript-save');
+  transcriptSave.addEventListener('click', async () => {
+    if (!api.saveTranscriptToDisk) return;
+    try {
+      const r = await api.saveTranscriptToDisk();
+      audioStatus.textContent = r && r.success
+        ? ('Transcript saved: ' + (r.filename || r.path))
+        : ('Save failed: ' + ((r && r.error) || 'unknown'));
+    } catch (_) { audioStatus.textContent = 'Save failed: backend unreachable.'; }
+  });
+
+  // Suggestions (what should I say)
+  const suggestionsBox = document.getElementById('suggestions-box');
+  const autoSuggestToggle = document.getElementById('auto-suggest-toggle');
+  const btnAskNow = document.getElementById('btn-ask-now');
+
+  function renderSuggestions(payload) {
+    if (payload.error) {
+      suggestionsBox.innerHTML = '<span style="color:#ff3b30;">' + payload.error + '</span>';
+      return;
+    }
+    const list = payload.suggestions || [];
+    if (!list.length) {
+      suggestionsBox.innerHTML = '<span class="muted">No suggestion (need more conversation).</span>';
+      return;
+    }
+    suggestionsBox.innerHTML = '';
+    list.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:8px; align-items:flex-start; cursor:pointer; padding:6px; border-radius:7px;';
+      row.onmouseenter = () => { row.style.background = 'rgba(255,255,255,0.07)'; };
+      row.onmouseleave = () => { row.style.background = 'transparent'; };
+      row.title = 'Click to copy';
+      row.onclick = () => { navigator.clipboard.writeText(s); };
+      row.innerHTML = `<span style="color:#4c9aff; font-weight:700;">${i + 1}.</span>
+        <span style="font-size:14px; line-height:1.45; color:#f2f2f4;">${s.replace(/[<>&]/g, (c)=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c]))}</span>`;
+      suggestionsBox.appendChild(row);
+    });
+  }
+
+  function askNow() {
+    if (!window.AudioCapture || !window.AudioCapture.isRunning()) {
+      suggestionsBox.innerHTML = '<span class="muted">Start audio capture first (needs the live transcript).</span>';
+      return;
+    }
+    suggestionsBox.innerHTML = '<span class="muted">Thinking…</span>';
+    const ok = window.AudioCapture.suggestNow(toneSelect.value);
+    if (!ok) suggestionsBox.innerHTML = '<span class="muted">Transcription channel not open. Enable "Transcribe" and Start.</span>';
+  }
+
+  btnAskNow.addEventListener('click', askNow);
+  if (api.onAskNow) api.onAskNow(() => { showView('audio'); askNow(); });
+  autoSuggestToggle.addEventListener('change', () => {
+    if (window.AudioCapture && window.AudioCapture.setAutoSuggest) {
+      window.AudioCapture.setAutoSuggest(autoSuggestToggle.checked);
+    }
+  });
+
+  audioRefresh.addEventListener('click', initAudio);
+
+  // Toggle the (collapsed) device-settings panel.
+  document.getElementById('audio-devices-toggle').addEventListener('click', () => {
+    document.getElementById('audio-devices').classList.toggle('hidden');
+  });
+
+  audioToggle.addEventListener('click', async () => {
+    if (!window.AudioCapture) return;
+    if (window.AudioCapture.isRunning()) {
+      await window.AudioCapture.stop();
+      meterMe.style.width = '0%';
+      meterThem.style.width = '0%';
+      audioToggle.textContent = '● Start';
+      audioToggle.classList.remove('recording');
+      audioStatus.textContent = 'Stopped.';
+      return;
+    }
+    try {
+      const wantTranscribe = transcribeToggle.checked;
+      transcriptStarted = false;
+      await window.AudioCapture.start(devMe.value || null, devThem.value || null, onLevel, {
+        transcribe: wantTranscribe,
+        backendUrl: api.backendUrl,
+        onTranscript: appendTranscript,
+        onSuggestions: renderSuggestions,
+        onStatus: (s) => {
+          if (s === 'reconnecting') audioStatus.innerHTML = '<span style="color:#ffb020;">Reconnecting to backend…</span>';
+          else if (s === 'disconnected') audioStatus.innerHTML = '<span style="color:#ff3b30;">Transcription disconnected.</span>';
+          else if (s === 'connected') audioStatus.textContent = 'Connected. Transcribing.';
+        },
+        autoSuggest: autoSuggestToggle.checked,
+        tone: toneSelect.value,
+      });
+      audioToggle.textContent = '■ Stop';
+      let msg = devThem.value
+        ? 'Capturing Me + Them. Speak / play audio to see the meters move.'
+        : 'Capturing Me only (no "Them" device selected).';
+      if (wantTranscribe) msg += ' Transcribing (~4s chunks).';
+      audioStatus.textContent = msg;
+    } catch (e) {
+      audioStatus.innerHTML = '<span style="color:#ff3b30;">Could not start capture: ' + (e && e.message ? e.message : e) + '</span>';
+    }
+  });
+
+  // Keep AudioCapture's tone in sync when the Answer-view tone changes too.
+  toneSelect.addEventListener('change', () => {
+    if (window.AudioCapture && window.AudioCapture.setTone) window.AudioCapture.setTone(toneSelect.value);
+  });
+
+  // Lazily initialize audio devices the first time the Audio view opens.
+  navs.audio.addEventListener('click', () => { if (!audioInited) initAudio(); });
+
+  // ── Backend readiness check (Phase 7) ───────────────────────────────────
+  async function checkBackend() {
+    if (!api.health) return;
+    try {
+      const h = await api.health();
+      if (h && h.success) {
+        setStatus(h.openai_configured ? 'Answer' : 'Answer — no API key', h.openai_configured ? 'idle' : 'error');
+        if (!h.openai_configured && answerBody.querySelector('.muted')) {
+          answerBody.innerHTML = '<span class="muted">Backend connected, but no OpenAI key is set. Add OPENAI_API_KEY to .env and restart the backend to get answers.</span>';
+        }
+      }
+    } catch (_) {
+      setStatus('Backend offline', 'error');
+      answerBody.innerHTML = '<span class="muted">Cannot reach the backend. Start it: <code>python3 server.py</code>.</span>';
+    }
+  }
+  checkBackend();
+</script>
 </body>
 </html>
