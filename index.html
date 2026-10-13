@@ -285,7 +285,7 @@
     </div>
 
     <div id="audio-status" class="muted" style="font-size:11px;">
-      Me = your mic, Them = system audio (BlackHole via a Multi-Output Device).
+      Me = your mic. Them = system audio (captured directly; leave the device on "(none)"). Pick a device only to override.
     </div>
 
     <!-- Suggestions (demoted; auto off by default) -->
@@ -651,11 +651,12 @@
       audioStatus.innerHTML = '<span style="color:#ff3b30;">Microphone permission denied. Grant it in System Settings → Privacy &amp; Security → Microphone.</span>';
     }
     fillDeviceSelect(devMe, info.devices, info.suggestedMe, false);
-    fillDeviceSelect(devThem, info.devices, info.suggestedThem, true);
-    if (!info.suggestedThem) {
-      audioStatus.innerHTML = 'No loopback device found. Install BlackHole and route output via a Multi-Output Device to capture "Them".';
-    } else if (info.granted) {
-      audioStatus.textContent = 'Ready. Press Start — both meters should move with sound.';
+    // "Them" defaults to system loopback (the '(none)' option now means
+    // "capture system audio via getDisplayMedia"), so we no longer force a
+    // loopback input device. A device can still be picked to override.
+    fillDeviceSelect(devThem, info.devices, info.suggestedThem || '', true);
+    if (info.granted) {
+      audioStatus.textContent = 'Ready. Press Start — "Them" uses system audio by default; both meters should move with sound.';
     }
     audioInited = true;
   }
@@ -868,14 +869,18 @@
           if (s === 'reconnecting') audioStatus.innerHTML = '<span style="color:#ffb020;">Reconnecting to backend…</span>';
           else if (s === 'disconnected') audioStatus.innerHTML = '<span style="color:#ff3b30;">Transcription disconnected.</span>';
           else if (s === 'connected') audioStatus.textContent = 'Connected. Transcribing.';
+          else if (s && s.indexOf('them-failed:') === 0) {
+            audioStatus.innerHTML = '<span style="color:#ffb020;">Capturing "Me" only — system audio ("Them") unavailable: '
+              + s.slice('them-failed:'.length) + '</span>';
+          }
         },
         autoSuggest: autoSuggestToggle.checked,
         tone: toneSelect.value,
       });
       audioToggle.textContent = '■ Stop';
       let msg = devThem.value
-        ? 'Capturing Me + Them. Speak / play audio to see the meters move.'
-        : 'Capturing Me only (no "Them" device selected).';
+        ? 'Capturing Me + Them (selected device). Speak / play audio to see the meters move.'
+        : 'Capturing Me + Them (system audio). Speak / play call audio to see the meters move.';
       if (wantTranscribe) msg += ' Transcribing (~4s chunks).';
       audioStatus.textContent = msg;
     } catch (e) {

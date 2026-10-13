@@ -323,6 +323,26 @@ function configureMediaPermissions() {
     ses.setPermissionCheckHandler((webContents, permission) =>
       permission === 'media' || permission === 'audioCapture');
   }
+
+  // Loopback (system) audio capture for the "Them" stream.
+  // When the renderer calls getDisplayMedia({ audio: true, video: true }), we
+  // answer with a screen video source plus the OS audio loopback. This lets us
+  // capture the remote caller's voice (what plays out of the speakers) WITHOUT
+  // any third-party driver (BlackHole / VB-CABLE / Stereo Mix).
+  //   - Windows: full system-audio loopback is supported.
+  //   - macOS 13+: supported; the first use shows a system permission prompt.
+  if (ses.setDisplayMediaRequestHandler) {
+    ses.setDisplayMediaRequestHandler((request, callback) => {
+      desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+        // 'loopback' = capture the system audio mix. Pair it with a screen
+        // video source because getDisplayMedia requires a video track; the
+        // renderer immediately drops the video track and keeps only audio.
+        callback({ video: sources[0], audio: 'loopback' });
+      }).catch(() => {
+        callback({});
+      });
+    }, { useSystemPicker: false });
+  }
 }
 
 app.whenReady().then(() => {

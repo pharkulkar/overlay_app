@@ -70,6 +70,28 @@
     return navigator.mediaDevices.getUserMedia(constraints);
   }
 
+  // Capture SYSTEM (loopback) audio for the "Them" stream — i.e. whatever is
+  // playing out of the speakers, which includes the remote caller's voice.
+  // Relies on the Electron main process answering the display-media request
+  // with { audio: 'loopback' } (see main.js setDisplayMediaRequestHandler),
+  // so no BlackHole / VB-CABLE / Stereo Mix device is required.
+  async function openSystemLoopbackStream() {
+    // getDisplayMedia requires a video track; we request video then discard it
+    // and keep only the audio track.
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true,
+    });
+    const audioTracks = stream.getAudioTracks();
+    if (!audioTracks.length) {
+      stream.getTracks().forEach((t) => t.stop());
+      throw new Error('No system audio track available (loopback capture not granted).');
+    }
+    // Drop the video track — we only need the audio.
+    stream.getVideoTracks().forEach((t) => { try { stream.removeTrack(t); t.stop(); } catch (_) {} });
+    return stream;
+  }
+
   // Attach a Web Audio analyser to a stream and drive a 0..1 level callback.
   function startMetering(slot, stream, onLevel) {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -239,11 +261,24 @@
       startMetering(state.me, state.me.stream, (lvl) => onLevel('me', lvl));
       if (state.transcribe && state.ws) startChunkedRecording(state.me, 'me');
 
-      // Them (loopback/system). Only if a device is chosen.
-      if (themDeviceId) {
-        state.them.stream = await openStream(themDeviceId);
+      // Them (the other person's voice = system/output audio).
+      //   - If an explicit input device is selected (e.g. a loopback driver
+      //     like VB-CABLE / BlackHole / Stereo Mix), capture that.
+      //   - Otherwise default to native system loopback via getDisplayMedia,
+      //     which needs no extra driver (Electron grants { audio: 'loopback' }).
+      try {
+        if (themDeviceId) {
+          state.them.stream = await openStream(themDeviceId);
+        } else {
+          state.them.stream = await openSystemLoopbackStream();
+        }
         startMetering(state.them, state.them.stream, (lvl) => onLevel('them', lvl));
         if (state.transcribe && state.ws) startChunkedRecording(state.them, 'them');
+      } catch (err) {
+        // Don't let a failed "Them" capture tear down the whole session —
+        // "Me" keeps working. Surface the reason via onStatus if provided.
+        state.them.stream = null;
+        if (state.onStatus) state.onStatus('them-failed:' + (err && err.message ? err.message : err));
       }
       state.running = true;
     },
