@@ -36,6 +36,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Main process -> overlay: OCR text ready (editable before asking)
   onOcrReady: (cb) => ipcRenderer.on('ocr-ready', (_e, payload) => cb(payload)),
 
+  // Main process -> overlay: the app is about to quit. Lets the renderer stop
+  // audio capture / close sockets cleanly. One-way, no payload trusted.
+  onAppWillQuit: (cb) => ipcRenderer.on('app-will-quit', () => {
+    if (typeof cb === 'function') cb();
+  }),
+
 
   // Ask OpenAI with (possibly edited) text; optionally persist onto a record.
   askText: async (text, tone, recordId) => {

@@ -351,6 +351,13 @@ app.whenReady().then(() => {
   registerShortcuts();
 });
 
+// Graceful shutdown: give the overlay renderer a chance to stop audio capture,
+// close its WebSocket, and release tracks before the process exits. The
+// renderer also listens to window 'beforeunload' as a belt-and-suspenders.
+app.on('before-quit', () => {
+  sendToOverlay('app-will-quit', {});
+});
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });

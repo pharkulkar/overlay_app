@@ -163,6 +163,80 @@
   #ctx-menu .ctx-item:hover { background: rgba(76,154,255,0.9); color: #fff; }
   #ctx-menu .ctx-sep { height: 1px; background: rgba(255,255,255,0.12); margin: 4px 6px; }
 
+  /* ── Interview (Automatic) mode ─────────────────────────── */
+  /* Compact live status strip. Stays small so the overlay isn't distracting. */
+  #iv-statusbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 8px 10px;
+  }
+  .iv-pill {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+    border: 1px solid rgba(255,255,255,0.14); color: #cfd6e2;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .iv-pill .live-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #555; flex-shrink: 0;
+  }
+  /* State colors on the status pill. */
+  .iv-pill[data-state="STOPPED"] { color: #9a9fa8; }
+  .iv-pill[data-state="STOPPED"] .live-dot { background: #555; }
+  .iv-pill[data-state="PAUSED"] { color: #ffb020; border-color: rgba(255,176,32,0.4); }
+  .iv-pill[data-state="PAUSED"] .live-dot { background: #ffb020; }
+  .iv-pill[data-state="LISTENING"] { color: #4cd964; border-color: rgba(76,217,100,0.4); }
+  .iv-pill[data-state="LISTENING"] .live-dot { background: #4cd964; animation: ivpulse 1.2s infinite; }
+  .iv-pill[data-state="QUESTION DETECTED"] { color: #4c9aff; border-color: rgba(76,154,255,0.4); }
+  .iv-pill[data-state="QUESTION DETECTED"] .live-dot { background: #4c9aff; }
+  .iv-pill[data-state="GENERATING ANSWER"] { color: #4c9aff; border-color: rgba(76,154,255,0.4); }
+  .iv-pill[data-state="GENERATING ANSWER"] .live-dot { background: #4c9aff; animation: ivpulse 0.8s infinite; }
+  .iv-pill[data-state="ANSWER READY"] { color: #4cd964; border-color: rgba(76,217,100,0.4); }
+  .iv-pill[data-state="ANSWER READY"] .live-dot { background: #4cd964; }
+  @keyframes ivpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .iv-meta { font-size: 10px; color: #7a7f88; display: inline-flex; align-items: center; gap: 4px; }
+  .iv-conn-ok { color: #4cd964; }
+  .iv-conn-bad { color: #ff3b30; }
+  .iv-conn-warn { color: #ffb020; }
+
+  /* Subtle listening meter inside the strip. */
+  .iv-meter { width: 54px; height: 6px; background: rgba(255,255,255,0.08);
+    border-radius: 6px; overflow: hidden; }
+  .iv-meter > span { display: block; height: 100%; width: 0%; background: #4cd964;
+    border-radius: 6px; transition: width 0.06s linear; }
+
+  /* Live transcript (compact, single line emphasis). */
+  #iv-transcript {
+    font-size: 12px; line-height: 1.5; color: #cfd6e2; min-height: 20px;
+    max-height: 64px; overflow-y: auto; padding: 2px 2px;
+  }
+  #iv-transcript .partial { color: #8b93a1; font-style: italic; }
+
+  /* Q/A panel */
+  #iv-qa { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+    background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 10px; }
+  .qa-card {
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+    background: rgba(255,255,255,0.03); padding: 10px 12px;
+  }
+  .qa-card.current { border-color: rgba(76,154,255,0.45); background: rgba(76,154,255,0.06); }
+  .qa-q { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.45; display: flex; gap: 6px; }
+  .qa-q .q-mark { color: #4c9aff; flex-shrink: 0; }
+  .qa-badge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
+  .qa-badge.followup { background: rgba(255,176,32,0.18); color: #ffb020; }
+  .qa-badge.manual { background: rgba(154,159,168,0.18); color: #cfd6e2; }
+  .qa-genline { font-size: 10px; color: #4c9aff; margin: 6px 0 4px; display: flex; align-items: center; gap: 6px; }
+  .qa-genline .spin { width: 9px; height: 9px; border-radius: 50%;
+    border: 2px solid rgba(76,154,255,0.3); border-top-color: #4c9aff; animation: ivspin 0.7s linear infinite; }
+  @keyframes ivspin { to { transform: rotate(360deg); } }
+  .qa-a { font-size: 13px; line-height: 1.55; color: #f2f2f4; white-space: pre-wrap; word-break: break-word;
+    margin-top: 4px; }
+  .qa-a.collapsed { max-height: 72px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 60%, transparent); }
+  .qa-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .qa-err { color: #ff3b30; font-size: 12px; margin-top: 6px; }
+
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 </style>
@@ -176,6 +250,7 @@
     <span class="title">Assistant</span>
     <div class="nav">
       <button class="nav-btn active" id="nav-answer">Answer</button>
+      <button class="nav-btn" id="nav-interview">Interview</button>
       <button class="nav-btn" id="nav-gallery">Gallery</button>
       <button class="nav-btn" id="nav-audio">Audio</button>
     </div>
@@ -229,6 +304,43 @@
     <div id="history-wrap" class="interactive hidden">
       <div id="history-toggle" class="zone-label" style="cursor:pointer;"><span id="history-caret">▸</span> <span id="history-count">History</span></div>
       <div id="history-list" class="hidden" style="margin-top:6px; max-height:140px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- Interview: Automatic listen → detect → answer (hands-free). -->
+  <div class="view hidden" id="view-interview">
+    <!-- Controls -->
+    <div class="actions interactive" style="flex-wrap:wrap;">
+      <button class="act-btn" id="iv-start" title="Begin listening to the interviewer">▶ Start Listening</button>
+      <button class="act-btn" id="iv-pause" title="Pause listening" disabled>⏸ Pause</button>
+      <button class="act-btn" id="iv-resume" title="Resume listening" disabled>▶ Resume</button>
+      <button class="act-btn" id="iv-stop" title="Stop listening" disabled>■ Stop</button>
+    </div>
+
+    <!-- Compact live status strip. -->
+    <div id="iv-statusbar" class="interactive">
+      <span class="iv-pill" id="iv-state" data-state="STOPPED"><span class="live-dot"></span><span id="iv-state-label">Stopped</span></span>
+      <span class="iv-meter" title="Interviewer audio level"><span id="iv-level"></span></span>
+      <span class="iv-meta" id="iv-source-meta">Interviewer (system audio)</span>
+      <span class="spacer"></span>
+      <span class="iv-meta" id="iv-locale"></span>
+      <span class="iv-meta" id="iv-conn">Disconnected</span>
+    </div>
+
+    <!-- Live transcript (compact). -->
+    <div class="zone-label">Interviewer transcript</div>
+    <div id="iv-transcript" class="interactive"><span class="muted">Press Start Listening. The app listens to the interviewer (system audio), detects questions, and answers automatically — no need to press Ask.</span></div>
+
+    <!-- Error line (hidden unless there is one). -->
+    <div id="iv-error" class="qa-err interactive hidden"></div>
+
+    <!-- Question / Answer history (newest first). -->
+    <div class="zone-label" style="margin-top:2px;">Questions &amp; answers</div>
+    <div id="iv-qa" class="interactive"><span class="muted">Detected questions and their professional answers appear here automatically.</span></div>
+
+    <div class="iv-meta interactive" style="font-size:10px;">
+      Listens to the interviewer via system audio (what plays through your speakers), not your microphone.
+      For a manual question, use the <b>Answer</b> tab.
     </div>
   </div>
 
@@ -317,6 +429,7 @@
 </div>
 
 <script src="audio.js"></script>
+<script src="interview.js"></script>
 <script>
   const api = window.electronAPI || {};
 
@@ -359,11 +472,13 @@
 
   const views = {
     answer: document.getElementById('view-answer'),
+    interview: document.getElementById('view-interview'),
     gallery: document.getElementById('view-gallery'),
     audio: document.getElementById('view-audio'),
   };
   const navs = {
     answer: document.getElementById('nav-answer'),
+    interview: document.getElementById('nav-interview'),
     gallery: document.getElementById('nav-gallery'),
     audio: document.getElementById('nav-audio'),
   };
@@ -396,6 +511,7 @@
     if (which === 'gallery') loadGallery();
   }
   navs.answer.addEventListener('click', () => showView('answer'));
+  navs.interview.addEventListener('click', () => showView('interview'));
   navs.gallery.addEventListener('click', () => showView('gallery'));
   navs.audio.addEventListener('click', () => showView('audio'));
 
@@ -895,6 +1011,275 @@
 
   // Lazily initialize audio devices the first time the Audio view opens.
   navs.audio.addEventListener('click', () => { if (!audioInited) initAudio(); });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Automatic Interview Mode controller
+  // ══════════════════════════════════════════════════════════════════════
+  (function initInterviewUI() {
+    const IV = window.InterviewMode;
+    if (!IV) return; // module failed to load; Answer-tab fallback still works.
+
+    const el = {
+      start: document.getElementById('iv-start'),
+      pause: document.getElementById('iv-pause'),
+      resume: document.getElementById('iv-resume'),
+      stop: document.getElementById('iv-stop'),
+      state: document.getElementById('iv-state'),
+      stateLabel: document.getElementById('iv-state-label'),
+      level: document.getElementById('iv-level'),
+      locale: document.getElementById('iv-locale'),
+      conn: document.getElementById('iv-conn'),
+      transcript: document.getElementById('iv-transcript'),
+      error: document.getElementById('iv-error'),
+      qa: document.getElementById('iv-qa'),
+    };
+
+    let healthLoaded = false;
+    let qaStarted = false;
+    const cards = new Map();      // questionId -> { root, q, a, gen, err, expandBtn, retryBtn }
+    let partialNode = null;       // live partial-transcript line
+
+    function setControls() {
+      const running = IV.isRunning();
+      const paused = IV.isPaused();
+      el.start.disabled = running;
+      el.pause.disabled = !running || paused;
+      el.resume.disabled = !running || !paused;
+      el.stop.disabled = !running;
+    }
+
+    function setStatePill(phase) {
+      el.state.setAttribute('data-state', phase);
+      el.stateLabel.textContent = phase.charAt(0) + phase.slice(1).toLowerCase();
+    }
+
+    function showError(msg) {
+      if (!msg) { el.error.classList.add('hidden'); el.error.textContent = ''; return; }
+      el.error.classList.remove('hidden');
+      el.error.textContent = msg;
+    }
+
+    // Show the backend's configured speech locale (the interviewer language).
+    async function loadHealth() {
+      try {
+        const info = await IV.init(api.backendUrl);
+        if (info.speechLocale) el.locale.textContent = info.speechLocale;
+        if (info.openaiConfigured === false) {
+          showError('Backend has no OpenAI key set — answers will fail. Add OPENAI_API_KEY and restart the backend.');
+        }
+        healthLoaded = true;
+      } catch (_) { /* non-fatal; locale label stays blank */ }
+    }
+
+    function esc2(s) {
+      return (s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    }
+
+    function clearCurrentFlag() {
+      cards.forEach((c) => c.root.classList.remove('current'));
+    }
+
+    // Create (or return existing) a Q/A card, newest on top. One card PER
+    // question id, so streaming chunks update in place (no duplicate cards).
+    function ensureCard(questionId, questionText, opts) {
+      opts = opts || {};
+      let c = cards.get(questionId);
+      if (c) {
+        // Fill in the question text if the card was created answer-first.
+        if (questionText && !c.q.querySelector('.q-text').textContent) {
+          c.q.querySelector('.q-text').textContent = questionText;
+        }
+        return c;
+      }
+
+      if (!qaStarted) { el.qa.innerHTML = ''; qaStarted = true; }
+
+      const root = document.createElement('div');
+      root.className = 'qa-card current';
+      clearCurrentFlag();
+
+      const q = document.createElement('div');
+      q.className = 'qa-q';
+      let badge = '';
+      if (opts.category) badge = '<span class="qa-badge followup">' + esc2(opts.category) + '</span>';
+      q.innerHTML = '<span class="q-mark">Q</span><span class="q-text">' + esc2(questionText) + '</span>' + badge;
+
+      const gen = document.createElement('div');
+      gen.className = 'qa-genline hidden';
+      gen.innerHTML = '<span class="spin"></span> Generating answer…';
+
+      const a = document.createElement('div');
+      a.className = 'qa-a';
+      a.textContent = '';
+
+      const err = document.createElement('div');
+      err.className = 'qa-err hidden';
+
+      const actions = document.createElement('div');
+      actions.className = 'qa-actions';
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'act-btn'; copyBtn.textContent = '⧉ Copy';
+      copyBtn.addEventListener('click', () => { if (a.textContent) navigator.clipboard.writeText(a.textContent); });
+      const expandBtn = document.createElement('button');
+      expandBtn.className = 'act-btn'; expandBtn.textContent = 'Expand';
+      expandBtn.style.display = 'none';
+      expandBtn.addEventListener('click', () => {
+        const collapsed = a.classList.toggle('collapsed');
+        expandBtn.textContent = collapsed ? 'Expand' : 'Collapse';
+      });
+      // Manual retry falls back to the REST /api/ask path (independent of the
+      // live detection), so a failed auto-answer is still recoverable.
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'act-btn'; retryBtn.textContent = '↻ Retry';
+      retryBtn.style.display = 'none';
+      retryBtn.addEventListener('click', async () => {
+        err.classList.add('hidden');
+        gen.classList.remove('hidden');
+        a.textContent = '';
+        const qtext = q.querySelector('.q-text').textContent || '';
+        try {
+          const data = api.askText ? await api.askText(qtext, toneSelect.value, null) : null;
+          gen.classList.add('hidden');
+          if (data && data.success) { a.textContent = data.answer || ''; maybeCollapse(c); }
+          else { err.classList.remove('hidden'); err.textContent = (data && data.error) || 'Retry failed.'; }
+        } catch (_) { gen.classList.add('hidden'); err.classList.remove('hidden'); err.textContent = 'Backend unreachable.'; }
+      });
+      actions.appendChild(copyBtn);
+      actions.appendChild(expandBtn);
+      actions.appendChild(retryBtn);
+
+      root.appendChild(q);
+      root.appendChild(gen);
+      root.appendChild(a);
+      root.appendChild(err);
+      root.appendChild(actions);
+      el.qa.insertBefore(root, el.qa.firstChild);
+
+      c = { root, q, a, gen, err, expandBtn, retryBtn };
+      cards.set(questionId, c);
+      return c;
+    }
+
+    function maybeCollapse(c) {
+      if (c.a.scrollHeight > 90 && c.expandBtn.style.display === 'none') {
+        c.a.classList.add('collapsed');
+        c.expandBtn.style.display = '';
+        c.expandBtn.textContent = 'Expand';
+      }
+    }
+
+    // ── Wire InterviewMode callbacks (names match the rewritten module) ──────
+    const callbacks = {
+      onPhase: (p) => { setStatePill(p.phase); setControls(); },
+      onLevel: (lvl) => { el.level.style.width = Math.round((lvl || 0) * 100) + '%'; },
+      onConnection: (s) => {
+        if (s.connected) { el.conn.textContent = 'Connected'; el.conn.className = 'iv-meta iv-conn-ok'; }
+        else if (s.reconnecting) { el.conn.textContent = 'Reconnecting…'; el.conn.className = 'iv-meta iv-conn-warn'; }
+        else { el.conn.textContent = 'Disconnected'; el.conn.className = 'iv-meta iv-conn-bad'; }
+      },
+      onTranscript: (t) => {
+        if (!t.text) return;
+        if (!t.final) {
+          if (!partialNode) {
+            partialNode = document.createElement('div');
+            partialNode.className = 'partial';
+            el.transcript.appendChild(partialNode);
+          }
+          partialNode.textContent = t.text;
+        } else {
+          if (partialNode) { partialNode.remove(); partialNode = null; }
+          if (el.transcript.querySelector('.muted')) el.transcript.innerHTML = '';
+          const line = document.createElement('div');
+          line.textContent = t.text;
+          el.transcript.appendChild(line);
+        }
+        el.transcript.scrollTop = el.transcript.scrollHeight;
+      },
+      onQuestionDetected: (q) => {
+        showError('');
+        ensureCard(q.questionId, q.text, { category: q.category });
+      },
+      onAnswerStarted: (s) => {
+        const c = ensureCard(s.questionId, '');
+        c.gen.classList.remove('hidden');
+        c.err.classList.add('hidden');
+        c.retryBtn.style.display = 'none';
+        c.a.textContent = '';
+      },
+      onAnswerChunk: (s) => {
+        const c = ensureCard(s.questionId, '');
+        c.gen.classList.remove('hidden');
+        c.a.textContent = s.text || '';   // module gives cumulative text
+        maybeCollapse(c);
+        el.qa.scrollTop = 0;
+      },
+      onAnswerCompleted: (s) => {
+        const c = ensureCard(s.questionId, '');
+        c.gen.classList.add('hidden');
+        c.a.textContent = s.text || c.a.textContent;
+        maybeCollapse(c);
+      },
+      onQuestionCancelled: (s) => {
+        if (s.questionId && cards.has(s.questionId)) {
+          const c = cards.get(s.questionId);
+          c.gen.classList.add('hidden');
+          if (!c.a.textContent) { c.err.classList.remove('hidden'); c.err.textContent = 'Superseded by a newer question.'; }
+        }
+      },
+      onError: (e) => {
+        if (e.questionId && cards.has(e.questionId)) {
+          const c = cards.get(e.questionId);
+          c.gen.classList.add('hidden');
+          c.err.classList.remove('hidden');
+          c.err.textContent = e.message || 'Error';
+          c.retryBtn.style.display = '';   // offer manual retry via /api/ask
+        } else {
+          showError(e.message || 'Error');
+        }
+      },
+      onSessionStarted: (s) => { if (s.speechLocale) el.locale.textContent = s.speechLocale; },
+      onDevicesChanged: () => {},
+    };
+
+    function startOpts() {
+      return Object.assign({
+        backendUrl: api.backendUrl,
+        tone: toneSelect.value,
+      }, callbacks);
+    }
+
+    // ── Controls ────────────────────────────────────────────────────────────
+    el.start.addEventListener('click', async () => {
+      showError('');
+      qaStarted = false;
+      cards.clear();
+      partialNode = null;
+      el.qa.innerHTML = '<span class="muted">Listening to the interviewer… detected questions are answered automatically.</span>';
+      el.transcript.innerHTML = '<span class="muted">Listening…</span>';
+      try {
+        await IV.start(startOpts());
+      } catch (e) {
+        setControls(); // onError already surfaced the detail
+      }
+      setControls();
+    });
+    el.pause.addEventListener('click', () => { IV.pause(); setControls(); });
+    el.resume.addEventListener('click', () => { IV.resume(); setControls(); });
+    el.stop.addEventListener('click', async () => { await IV.stop(); el.level.style.width = '0%'; setControls(); });
+
+    // Keep tone in sync with the shared tone selector.
+    toneSelect.addEventListener('change', () => { if (IV.isRunning()) IV.setTone(toneSelect.value); });
+
+    // Probe backend health (speech locale) when the Interview tab first opens.
+    navs.interview.addEventListener('click', () => { if (!healthLoaded) loadHealth(); });
+
+    // Clean teardown when the window is closing / reloading, or when the main
+    // process signals an impending quit.
+    window.addEventListener('beforeunload', () => { try { IV.stop(); } catch (_) {} });
+    if (api.onAppWillQuit) api.onAppWillQuit(() => { try { IV.stop(); } catch (_) {} });
+
+    setControls();
+  })();
 
   // ── Backend readiness check (Phase 7) ───────────────────────────────────
   async function checkBackend() {
