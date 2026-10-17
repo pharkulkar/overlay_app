@@ -23,6 +23,7 @@ function loadInterviewModule() {
     AudioContext: function () {},
     FileReader: function () {},
     fetch: function () { return Promise.reject(new Error('no network in tests')); },
+    performance: { now: () => Date.now() },
     requestAnimationFrame: () => 0,
     cancelAnimationFrame: () => {},
     setTimeout, clearTimeout, setInterval, clearInterval,

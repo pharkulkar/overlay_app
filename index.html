@@ -315,6 +315,8 @@
       <button class="act-btn" id="iv-pause" title="Pause listening" disabled>⏸ Pause</button>
       <button class="act-btn" id="iv-resume" title="Resume listening" disabled>▶ Resume</button>
       <button class="act-btn" id="iv-stop" title="Stop listening" disabled>■ Stop</button>
+      <span class="spacer"></span>
+      <button class="act-btn" id="iv-clear" title="Clear the transcript and all Q&amp;A cards">🗑 Clear</button>
     </div>
 
     <!-- Compact live status strip. -->
@@ -1024,6 +1026,7 @@
       pause: document.getElementById('iv-pause'),
       resume: document.getElementById('iv-resume'),
       stop: document.getElementById('iv-stop'),
+      clear: document.getElementById('iv-clear'),
       state: document.getElementById('iv-state'),
       stateLabel: document.getElementById('iv-state-label'),
       level: document.getElementById('iv-level'),
@@ -1266,6 +1269,22 @@
     el.pause.addEventListener('click', () => { IV.pause(); setControls(); });
     el.resume.addEventListener('click', () => { IV.resume(); setControls(); });
     el.stop.addEventListener('click', async () => { await IV.stop(); el.level.style.width = '0%'; setControls(); });
+
+    // Clear the screen (transcript + Q&A cards). Does NOT stop an active
+    // session — listening continues and new questions still appear.
+    function clearScreen() {
+      cards.clear();
+      qaStarted = false;
+      partialNode = null;
+      showError('');
+      const listening = IV.isRunning();
+      el.qa.innerHTML = '<span class="muted">' +
+        (listening ? 'Listening to the interviewer… detected questions are answered automatically.'
+                   : 'Detected questions and their professional answers appear here automatically.') + '</span>';
+      el.transcript.innerHTML = '<span class="muted">' +
+        (listening ? 'Listening…' : 'Press Start Listening to begin.') + '</span>';
+    }
+    el.clear.addEventListener('click', clearScreen);
 
     // Keep tone in sync with the shared tone selector.
     toneSelect.addEventListener('change', () => { if (IV.isRunning()) IV.setTone(toneSelect.value); });

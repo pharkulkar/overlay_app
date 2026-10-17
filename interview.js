@@ -9,8 +9,9 @@
 // It matches the REAL backend contract (see server.py):
 //
 //   STT path (reuses the existing /ws/audio Whisper transcriber):
-//     We capture the system-audio loopback as self-contained ~CHUNK_MS webm
-//     segments and send each as:
+//     We capture the system-audio loopback and, using voice-activity detection,
+//     send ONE complete utterance (the whole question, cut when the interviewer
+//     stops talking) as a self-contained webm:
 //       { speaker:'them', audio:<dataURL>, filename:'them.webm' }
 //     and receive back:
 //       { type:'transcript', speaker:'them', text:'...' }
@@ -39,9 +40,12 @@
 (function () {
   'use strict';
 
-  // Self-contained audio segment length (ms). Matches audio.js so we never
-  // accumulate a whole recording — each chunk is independently decodable.
-  const CHUNK_MS = 4000;
+  // Audio segmentation is driven by voice-activity detection (VAD), NOT a fixed
+  // timer: we buffer the interviewer's audio while they speak and only send it
+  // to Whisper once they go quiet (end of question). This answers the WHOLE
+  // question the moment they finish, instead of chasing partial fixed-length
+  // chunks. See the VAD constants and the metering loop below. Each flushed
+  // utterance is an independently decodable webm (no whole-recording buildup).
   const WS_RECONNECT_MIN = 1000;
   const WS_RECONNECT_MAX = 10000;
 
@@ -148,6 +152,10 @@
     return stream;
   }
 
+  // The metering loop doubles as a simple voice-activity detector (VAD): it
+  // computes the RMS level each animation frame, reports it for the UI meter,
+  // AND decides when the interviewer has STARTED and STOPPED speaking so we can
+  // segment on whole utterances (end-of-question) instead of fixed timers.
   function startMetering(stream) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
@@ -157,55 +165,121 @@
     srcNode.connect(analyser);
     const data = new Uint8Array(analyser.fftSize);
     state.ctx = ctx; state.analyser = analyser;
+
     const tick = () => {
       if (!state.analyser) return;
       analyser.getByteTimeDomainData(data);
       let sum = 0;
       for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
-      emit('onLevel', state.paused ? 0 : Math.min(1, Math.sqrt(sum / data.length) * 2.2));
+      const level = Math.min(1, Math.sqrt(sum / data.length) * 2.2);
+      emit('onLevel', state.paused ? 0 : level);
+      if (!state.paused) vadStep(level);
       state.raf = requestAnimationFrame(tick);
     };
     tick();
   }
 
-  // Record the loopback in self-contained ~CHUNK_MS webm segments; send each to
-  // /ws/audio for Whisper transcription. Restarting the recorder each interval
-  // keeps every chunk independently decodable (and bounds memory).
+  // ── VAD state machine (end-of-utterance segmentation) ──────────────────────
+  // We keep ONE recorder running continuously and buffer its data. When the
+  // interviewer has spoken (level above threshold) and then falls silent for
+  // VAD_SILENCE_MS, we treat that as end-of-question and flush the buffered
+  // audio as a single utterance to Whisper. A hard cap (VAD_MAX_UTTER_MS)
+  // flushes a non-stop talker so very long answers still get processed.
+  const VAD_SPEECH_LEVEL = 0.055;   // RMS above this = "speaking"
+  const VAD_SILENCE_MS = 650;       // quiet this long after speech = end of question
+  const VAD_MIN_SPEECH_MS = 350;    // ignore blips shorter than this
+  const VAD_MAX_UTTER_MS = 15000;   // safety flush for a continuous talker
+  const VAD_PREROLL_MS = 300;       // keep a little audio before speech onset
+
+  function vadStep(level) {
+    const v = state.vad;
+    if (!v || !v.active) return;
+    const now = performance.now();
+    const speaking = level >= VAD_SPEECH_LEVEL;
+
+    if (speaking) {
+      if (!v.inSpeech) { v.inSpeech = true; v.speechStart = now; }
+      v.lastVoiceTs = now;
+    }
+
+    if (v.inSpeech) {
+      // Hard cap: flush a continuous talker so we don't buffer forever.
+      if (now - v.speechStart >= VAD_MAX_UTTER_MS) { flushUtterance(); return; }
+      // End-of-utterance: enough quiet after real speech.
+      if (!speaking
+          && (now - v.lastVoiceTs) >= VAD_SILENCE_MS
+          && (v.lastVoiceTs - v.speechStart) >= VAD_MIN_SPEECH_MS) {
+        flushUtterance();
+      }
+    }
+  }
+
+  // Record continuously with a short timeslice so data accumulates in a bounded
+  // buffer; flushUtterance() turns the current buffer into one webm and sends
+  // it. We never keep a whole-conversation recording — the buffer is cleared on
+  // every flush.
   function startChunkedRecording() {
     const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
       ? 'audio/webm;codecs=opus'
       : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
 
-    const recordOnce = () => {
-      if (!state.stream || !state.running || state.paused) return;
-      let rec;
-      try { rec = mime ? new MediaRecorder(state.stream, { mimeType: mime }) : new MediaRecorder(state.stream); }
-      catch (_) { return; }
-      state.rec = rec;
-      const parts = [];
-      rec.ondataavailable = (e) => { if (e.data && e.data.size) parts.push(e.data); };
-      rec.onstop = async () => {
-        if (!parts.length) return;
-        const blob = new Blob(parts, { type: mime || 'audio/webm' });
-        parts.length = 0;
-        if (blob.size < 1200) return; // skip near-silent segments
-        if (state.sttWs && state.sttWs.readyState === WebSocket.OPEN) {
-          let dataUrl; try { dataUrl = await blobToDataUrl(blob); } catch (_) { return; }
-          sttSend({ speaker: 'them', audio: dataUrl, filename: 'them.webm' });
-          state.seq++;
-        }
-      };
-      try { rec.start(); } catch (_) { return; }
-      setTimeout(() => { if (rec.state !== 'inactive') { try { rec.stop(); } catch (_) {} } }, CHUNK_MS - 100);
+    state.vad = {
+      active: true, inSpeech: false,
+      speechStart: 0, lastVoiceTs: 0,
+      parts: [], mime,
     };
 
-    recordOnce();
-    state.recTimer = setInterval(recordOnce, CHUNK_MS);
+    startRecorderCycle();
+  }
+
+  // A MediaRecorder started with a timeslice emits a non-finalized stream of
+  // blobs that are only decodable together with the initial header blob. To
+  // keep every flushed utterance INDEPENDENTLY decodable, we instead run the
+  // recorder in gapless cycles: start → collect → on flush we stop (which
+  // finalizes a complete webm) and immediately start the next cycle.
+  function startRecorderCycle() {
+    const v = state.vad;
+    if (!v || !v.active || !state.stream || !state.running) return;
+    let rec;
+    try { rec = v.mime ? new MediaRecorder(state.stream, { mimeType: v.mime }) : new MediaRecorder(state.stream); }
+    catch (_) { return; }
+    state.rec = rec;
+    v.parts = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) v.parts.push(e.data); };
+    rec.onstop = () => {
+      const parts = v.parts; v.parts = [];
+      // Immediately begin the next cycle so no audio is dropped in the gap.
+      if (v.active && state.running && !state.paused) startRecorderCycle();
+      if (!parts.length || !v.wantSend) { v.wantSend = false; return; }
+      v.wantSend = false;
+      const blob = new Blob(parts, { type: v.mime || 'audio/webm' });
+      if (blob.size < 800) return; // guard against silence-only flushes
+      if (state.sttWs && state.sttWs.readyState === WebSocket.OPEN) {
+        blobToDataUrl(blob).then((dataUrl) => {
+          sttSend({ speaker: 'them', audio: dataUrl, filename: 'them.webm' });
+          state.seq++;
+        }).catch(() => {});
+      }
+    };
+    try { rec.start(); } catch (_) { return; }
+  }
+
+  // Flush the current utterance: mark it to be sent, stop the recorder (which
+  // finalizes the webm and triggers onstop → send + next cycle). Reset VAD so
+  // we wait for the next speech onset.
+  function flushUtterance() {
+    const v = state.vad;
+    if (!v) return;
+    v.inSpeech = false;
+    v.speechStart = 0;
+    v.lastVoiceTs = 0;
+    v.wantSend = true;
+    if (state.rec && state.rec.state !== 'inactive') { try { state.rec.stop(); } catch (_) { v.wantSend = false; } }
   }
 
   function stopCapture() {
     if (state.raf) { cancelAnimationFrame(state.raf); state.raf = null; }
-    if (state.recTimer) { clearInterval(state.recTimer); state.recTimer = null; }
+    if (state.vad) { state.vad.active = false; state.vad.wantSend = false; state.vad = null; }
     if (state.rec && state.rec.state !== 'inactive') { try { state.rec.stop(); } catch (_) {} }
     state.rec = null;
     state.analyser = null;
@@ -482,6 +556,9 @@
     pause() {
       if (!state.running || state.paused) return;
       state.paused = true;
+      // Discard the in-flight utterance (don't answer half a paused question)
+      // and halt the recorder cycle; onstop won't chain while paused.
+      if (state.vad) { state.vad.wantSend = false; state.vad.inSpeech = false; }
       if (state.rec && state.rec.state !== 'inactive') { try { state.rec.stop(); } catch (_) {} }
       setPhase(S.PAUSED);
     },
@@ -489,6 +566,12 @@
     resume() {
       if (!state.running || !state.paused) return;
       state.paused = false;
+      // Reset VAD and restart the gapless recorder cycle.
+      if (state.vad) {
+        state.vad.inSpeech = false; state.vad.speechStart = 0;
+        state.vad.lastVoiceTs = 0; state.vad.wantSend = false;
+      }
+      startRecorderCycle();
       setPhase(S.LISTENING);
     },
 
