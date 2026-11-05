@@ -15,10 +15,12 @@ const assert = require('assert');
 function loadInterviewModule() {
   const code = fs.readFileSync(path.join(__dirname, '..', 'interview.js'), 'utf8');
   const win = {};
+  const WebSocketStub = function () {};
+  WebSocketStub.OPEN = 1;  // so ivSend/sttSend readyState guard can match a seeded ws
   const sandbox = {
     window: win,
     navigator: { mediaDevices: {} },
-    WebSocket: function () {},
+    WebSocket: WebSocketStub,
     MediaRecorder: function () {},
     AudioContext: function () {},
     FileReader: function () {},
@@ -77,6 +79,14 @@ test('SESSION_STARTED adopts backend session id and locale', () => {
   s.send({ type: 'SESSION_STARTED', session_id: 'backend_abc', language: 'en', speech_locale: 'en-IN', ts: 1 });
   assert.strictEqual(s.st.sessionId, 'backend_abc');
   assert.strictEqual(s.last('onSessionStarted').speechLocale, 'en-IN');
+});
+
+// 1b) SESSION_STARTED adopts the backend's language SET.
+test('SESSION_STARTED adopts backend language set', () => {
+  const s = freshSession('local_tmp');
+  s.send({ type: 'SESSION_STARTED', session_id: 'backend_abc', language: 'hi', languages: ['hi', 'en'], speech_locale: 'hi-IN', ts: 1 });
+  assert.deepStrictEqual(Array.from(s.st.languages), ['hi', 'en']);
+  assert.deepStrictEqual(Array.from(s.last('onSessionStarted').languages), ['hi', 'en']);
 });
 
 // 2) Full flow: detect -> started -> chunk(delta) -> chunk -> completed.
@@ -187,6 +197,56 @@ test('answer chunk tolerated even if started event is missing', () => {
   s.withSid({ type: 'ANSWER_CHUNK', question_id: 'q1', text: 'Hello ' });
   s.withSid({ type: 'ANSWER_CHUNK', question_id: 'q1', text: 'world' });
   assert.strictEqual(s.last('onAnswerChunk').text, 'Hello world');
+});
+
+// 12) TRANSCRIPT_FINAL / QUESTION_DETECTED surface the per-turn language.
+test('language is surfaced on TRANSCRIPT_FINAL and QUESTION_DETECTED', () => {
+  const s = freshSession();
+  s.withSid({ type: 'TRANSCRIPT_FINAL', speaker: 'them', text: 'क्लोज़र क्या है।', language: 'hi' });
+  s.withSid({ type: 'QUESTION_DETECTED', question_id: 'q1', text: 'क्लोज़र क्या है।', category: 'technical', confidence: 0.8, language: 'hi' });
+  assert.strictEqual(s.last('onTranscript').language, 'hi');
+  assert.strictEqual(s.last('onQuestionDetected').language, 'hi');
+});
+
+// 13) start() normalizes an empty/omitted language set to ['en'].
+test('start() normalizes empty languages to [en]', () => {
+  const IV = loadInterviewModule();
+  // start() awaits getDisplayMedia; we only assert the normalization that runs
+  // synchronously before capture by invoking the normalization indirectly via
+  // setLanguages which shares the same rule.
+  IV.setLanguages([]);
+  assert.deepStrictEqual(Array.from(IV.getLanguages()), ['en']);
+  IV.setLanguages(['hi', 'mr']);
+  assert.deepStrictEqual(Array.from(IV.getLanguages()), ['hi', 'mr']);
+});
+
+// 14) setLanguages/getLanguages + setCandidateProfile/getCandidateProfile.
+test('language set and candidate-profile accessors round-trip', () => {
+  const IV = loadInterviewModule();
+  IV.setLanguages(['en', 'hi', 'zh']);
+  assert.deepStrictEqual(Array.from(IV.getLanguages()), ['en', 'hi', 'zh']);
+  IV.setCandidateProfile('Senior backend engineer, 8y.');
+  assert.strictEqual(IV.getCandidateProfile(), 'Senior backend engineer, 8y.');
+});
+
+// 15) Start-frame seam: _sendStartFrame builds + sends the frame with no socket.
+test('_sendStartFrame emits a start frame with the selected language set', () => {
+  const IV = loadInterviewModule();
+  const st = IV._state;
+  const captured = [];
+  st.sessionId = 'sess_seam';
+  st.languages = ['hi', 'en'];
+  st.language = 'hi';
+  st.candidateProfile = 'profile text';
+  st.ivWs = { readyState: 1, send: (s) => captured.push(JSON.parse(s)) };
+
+  IV._sendStartFrame();
+  assert.strictEqual(captured.length, 1);
+  const frame = captured[0];
+  assert.strictEqual(frame.type, 'start');
+  assert.deepStrictEqual(frame.languages, ['hi', 'en']);
+  assert.strictEqual(frame.language, frame.languages[0]);
+  assert.strictEqual(frame.candidate_profile, 'profile text');
 });
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');

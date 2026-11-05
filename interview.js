@@ -49,6 +49,32 @@
   const WS_RECONNECT_MIN = 1000;
   const WS_RECONNECT_MAX = 10000;
 
+  // Mirror of the backend's canonical language registry (interview_config.py
+  // SUPPORTED_LANGUAGES). Used for the Interview-tab dropdown before /api/health
+  // reconciles it. { code, name, native, locale }.
+  const SUPPORTED_LANGUAGES = [
+    { code: 'en', name: 'English', native: 'English', locale: 'en-IN' },
+    { code: 'hi', name: 'Hindi', native: 'हिन्दी', locale: 'hi-IN' },
+    { code: 'mr', name: 'Marathi', native: 'मराठी', locale: 'mr-IN' },
+    { code: 'zh', name: 'Chinese', native: '中文', locale: 'zh-CN' },
+    { code: 'es', name: 'Spanish', native: 'Español', locale: 'es-ES' },
+    { code: 'fr', name: 'French', native: 'Français', locale: 'fr-FR' },
+    { code: 'de', name: 'German', native: 'Deutsch', locale: 'de-DE' },
+    { code: 'ja', name: 'Japanese', native: '日本語', locale: 'ja-JP' },
+    { code: 'ko', name: 'Korean', native: '한국어', locale: 'ko-KR' },
+    { code: 'ar', name: 'Arabic', native: 'العربية', locale: 'ar-SA' },
+    { code: 'pt', name: 'Portuguese', native: 'Português', locale: 'pt-BR' },
+    { code: 'ru', name: 'Russian', native: 'Русский', locale: 'ru-RU' },
+    { code: 'it', name: 'Italian', native: 'Italiano', locale: 'it-IT' },
+    { code: 'nl', name: 'Dutch', native: 'Nederlands', locale: 'nl-NL' },
+    { code: 'tr', name: 'Turkish', native: 'Türkçe', locale: 'tr-TR' },
+    { code: 'ta', name: 'Tamil', native: 'தமிழ்', locale: 'ta-IN' },
+    { code: 'te', name: 'Telugu', native: 'తెలుగు', locale: 'te-IN' },
+    { code: 'bn', name: 'Bengali', native: 'বাংলা', locale: 'bn-IN' },
+    { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી', locale: 'gu-IN' },
+    { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', locale: 'pa-IN' },
+  ];
+
   // Finite UI states.
   const S = Object.freeze({
     STOPPED: 'STOPPED',
@@ -78,6 +104,7 @@
     paused: false,
     sessionId: null,
     language: null,       // base code reported by backend (e.g. 'en')
+    languages: ['en'],    // selected language set (base codes)
     speechLocale: null,   // e.g. 'en-IN' (informational)
     tone: null,
     backendUrl: null,
@@ -256,7 +283,7 @@
       if (blob.size < 800) return; // guard against silence-only flushes
       if (state.sttWs && state.sttWs.readyState === WebSocket.OPEN) {
         blobToDataUrl(blob).then((dataUrl) => {
-          sttSend({ speaker: 'them', audio: dataUrl, filename: 'them.webm' });
+          sttSend({ speaker: 'them', audio: dataUrl, filename: 'them.webm', languages: state.languages });
           state.seq++;
         }).catch(() => {});
       }
@@ -306,10 +333,12 @@
       if (msg.type === 'transcript' && (msg.speaker || 'them') === 'them') {
         const text = (msg.text || '').trim();
         if (!text) return;
+        const lang = msg.language || undefined;
         // Show it locally AND forward it to the interview session as a final
-        // utterance so the backend can detect + answer.
-        emit('onTranscript', { final: true, speaker: 'them', text });
-        ivSend({ type: 'transcript', text, is_final: true, speaker: 'them', timestamp: Date.now() / 1000 });
+        // utterance so the backend can detect + answer. Carry the detected
+        // language through so the session tags the turn correctly.
+        emit('onTranscript', { final: true, speaker: 'them', text, language: lang || null });
+        ivSend({ type: 'transcript', text, is_final: true, speaker: 'them', timestamp: Date.now() / 1000, language: lang });
       } else if (msg.type === 'error') {
         emit('onError', { message: 'Transcription: ' + (msg.error || 'error') });
       }
@@ -335,6 +364,21 @@
     return false;
   }
 
+  // Build the /ws/interview start frame (extracted so a test seam can capture
+  // it without opening a socket). The backend reuses an existing session for a
+  // repeated session_id, so a changed profile/language set only applies via a
+  // full Stop->Start (which mints a new session_id in start()).
+  function buildStartFrame() {
+    return {
+      type: 'start',
+      session_id: state.sessionId,
+      candidate_profile: state.candidateProfile,
+      language: state.language || undefined,
+      languages: state.languages,
+    };
+  }
+  function sendStartFrame() { return ivSend(buildStartFrame()); }
+
   function connectIvWs() {
     if (!state.backendUrl) return;
     const url = state.backendUrl.replace(/^http/, 'ws') + '/ws/interview';
@@ -344,12 +388,7 @@
       state.ivReconnect = WS_RECONNECT_MIN;
       reportConnection();
       // Start (or resume) the SAME session id so a reconnect doesn't fork it.
-      ivSend({
-        type: 'start',
-        session_id: state.sessionId,
-        candidate_profile: state.candidateProfile,
-        language: state.language || undefined,
-      });
+      sendStartFrame();
     };
     ws.onmessage = (ev) => { let msg; try { msg = JSON.parse(ev.data); } catch (_) { return; } handleIvEvent(msg); };
     ws.onclose = () => { state.ivWs = null; reportConnection(); if (state.running) scheduleIvReconnect(); };
@@ -381,8 +420,14 @@
       state.ivStarted = true;
       if (msg.session_id) state.sessionId = msg.session_id;
       if (msg.language) state.language = msg.language;
+      if (Array.isArray(msg.languages) && msg.languages.length) state.languages = msg.languages.slice();
       if (msg.speech_locale) state.speechLocale = msg.speech_locale;
-      emit('onSessionStarted', { sessionId: state.sessionId, language: state.language, speechLocale: state.speechLocale });
+      emit('onSessionStarted', {
+        sessionId: state.sessionId,
+        language: state.language,
+        languages: state.languages,
+        speechLocale: state.speechLocale,
+      });
       return;
     }
 
@@ -391,10 +436,10 @@
 
     switch (type) {
       case EVT.TRANSCRIPT_PARTIAL:
-        emit('onTranscript', { final: false, speaker: msg.speaker || 'them', text: msg.text || '' });
+        emit('onTranscript', { final: false, speaker: msg.speaker || 'them', text: msg.text || '', language: msg.language || null });
         break;
       case EVT.TRANSCRIPT_FINAL:
-        emit('onTranscript', { final: true, speaker: msg.speaker || 'them', text: msg.text || '' });
+        emit('onTranscript', { final: true, speaker: msg.speaker || 'them', text: msg.text || '', language: msg.language || null });
         break;
 
       case EVT.QUESTION_DETECTED: {
@@ -406,6 +451,7 @@
           text: (msg.text || '').trim(),
           category: msg.category || null,
           confidence: msg.confidence,
+          language: msg.language || null,
         });
         setPhase(S.QUESTION_DETECTED, { questionId: qid });
         break;
@@ -512,7 +558,11 @@
       state.backendUrl = opts.backendUrl || null;
       state.tone = opts.tone || null;
       state.candidateProfile = opts.candidateProfile || null;
-      state.language = opts.language || null;
+      state.languages = (Array.isArray(opts.languages) && opts.languages.length)
+        ? opts.languages.slice()
+        : ['en'];
+      // The start-frame primary language is the first selected code.
+      state.language = opts.language || state.languages[0] || null;
       state.sessionId = genId('sess');
       state.seq = 0;
       state.ivStarted = false;
@@ -597,6 +647,18 @@
 
     setTone(tone) { state.tone = tone || null; },
 
+    // Language set + candidate-profile accessors (pure state; applied on the
+    // NEXT start()/start-frame — a changed set never mutates a live session).
+    setLanguages(codes) {
+      state.languages = (Array.isArray(codes) && codes.length) ? codes.slice() : ['en'];
+    },
+    getLanguages() { return state.languages.slice(); },
+    setCandidateProfile(text) { state.candidateProfile = text || null; },
+    getCandidateProfile() { return state.candidateProfile; },
+
+    // The mirrored backend language registry (for the dropdown).
+    SUPPORTED_LANGUAGES: SUPPORTED_LANGUAGES,
+
     // Snapshot of Q/A pairs for history / tests.
     getHistory() {
       return state.questionOrder.map((qid) => {
@@ -607,6 +669,10 @@
 
     // Testing hooks (no live sockets needed).
     _handleIvEvent: handleIvEvent,
+    _sendStartFrame: sendStartFrame,
+    _buildStartFrame: buildStartFrame,
+    _ivSend: ivSend,
+    _sttSend: sttSend,
     _state: state,
   };
 

@@ -44,11 +44,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 
   // Ask OpenAI with (possibly edited) text; optionally persist onto a record.
-  askText: async (text, tone, recordId) => {
+  // `language` (optional) pins the answer language; omitted when undefined so
+  // the Answer tab's 3-arg calls stay byte-for-byte today's request.
+  askText: async (text, tone, recordId, language) => {
+    const body = { text, tone, record_id: recordId };
+    if (language) body.language = language;
     const res = await fetch(`${BACKEND_URL}/api/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, tone, record_id: recordId }),
+      body: JSON.stringify(body),
     });
     return res.json();
   },

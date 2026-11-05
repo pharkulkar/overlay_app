@@ -194,6 +194,28 @@
   .iv-pill[data-state="ANSWER READY"] .live-dot { background: #4cd964; }
   @keyframes ivpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
+  /* Multi-select language dropdown (native <details> disclosure popover). */
+  .iv-langs { position: relative; display: inline-block; }
+  .iv-langs > summary { list-style: none; cursor: pointer; user-select: none; }
+  .iv-langs > summary::-webkit-details-marker { display: none; }
+  .iv-langs-list {
+    position: absolute; z-index: 50; top: calc(100% + 4px); left: 0;
+    min-width: 150px; max-height: 220px; overflow-y: auto;
+    background: #1d1f24; border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 6px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  }
+  .iv-langs-list label {
+    display: flex; align-items: center; gap: 6px; padding: 3px 4px;
+    font-size: 11px; color: #d6d9df; cursor: pointer; white-space: nowrap;
+  }
+  .iv-langs-list label:hover { background: rgba(255,255,255,0.06); border-radius: 4px; }
+  .iv-langs-list input { margin: 0; }
+  .qa-lang-badge {
+    display: inline-block; margin-left: 6px; padding: 0 5px;
+    font-size: 9px; line-height: 15px; border-radius: 4px;
+    background: rgba(76,154,255,0.18); color: #9ec1ff; text-transform: uppercase;
+  }
+
   .iv-meta { font-size: 10px; color: #7a7f88; display: inline-flex; align-items: center; gap: 4px; }
   .iv-conn-ok { color: #4cd964; }
   .iv-conn-bad { color: #ff3b30; }
@@ -315,6 +337,10 @@
       <button class="act-btn" id="iv-pause" title="Pause listening" disabled>⏸ Pause</button>
       <button class="act-btn" id="iv-resume" title="Resume listening" disabled>▶ Resume</button>
       <button class="act-btn" id="iv-stop" title="Stop listening" disabled>■ Stop</button>
+      <details id="iv-langs" class="iv-langs" title="Select the languages the interviewer may speak">
+        <summary class="act-btn" id="iv-lang-summary">Languages: EN</summary>
+        <div class="iv-langs-list" id="iv-langs-list"></div>
+      </details>
       <span class="spacer"></span>
       <button class="act-btn" id="iv-clear" title="Clear the transcript and all Q&amp;A cards">🗑 Clear</button>
     </div>
@@ -1035,9 +1061,86 @@
       transcript: document.getElementById('iv-transcript'),
       error: document.getElementById('iv-error'),
       qa: document.getElementById('iv-qa'),
+      langs: document.getElementById('iv-langs'),
+      langSummary: document.getElementById('iv-lang-summary'),
+      langList: document.getElementById('iv-langs-list'),
     };
 
     let healthLoaded = false;
+    // Reconciled language registry (code -> {code,name,native,locale}) and the
+    // currently-selected set of codes. Defaults to the frontend mirror + ['en'].
+    let langRegistry = (IV.SUPPORTED_LANGUAGES || []).slice();
+    const LANG_STORAGE_KEY = 'iv.languages';
+
+    function readStoredLanguages() {
+      try {
+        const raw = localStorage.getItem(LANG_STORAGE_KEY);
+        if (!raw) return null;
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : null;
+      } catch (_) { return null; }
+    }
+    function writeStoredLanguages(codes) {
+      try { localStorage.setItem(LANG_STORAGE_KEY, JSON.stringify(codes)); } catch (_) {}
+    }
+    function availableCodes() { return langRegistry.map((l) => l.code); }
+    function getSelectedLanguages() {
+      if (!el.langList) return ['en'];
+      const checked = Array.prototype.slice
+        .call(el.langList.querySelectorAll('input[type=checkbox]:checked'))
+        .map((c) => c.value);
+      return checked.length ? checked : ['en'];
+    }
+    function updateLangSummary() {
+      const sel = getSelectedLanguages();
+      const head = sel.slice(0, 2).map((c) => c.toUpperCase()).join(', ');
+      const extra = sel.length > 2 ? ' (+' + (sel.length - 2) + ')' : '';
+      if (el.langSummary) el.langSummary.textContent = 'Languages: ' + head + extra;
+    }
+    function buildLangDropdown(selectedCodes) {
+      if (!el.langList) return;
+      const avail = availableCodes();
+      let sel = (selectedCodes || ['en']).filter((c) => avail.includes(c));
+      if (!sel.length) sel = ['en'];
+      el.langList.innerHTML = '';
+      langRegistry.forEach((lang) => {
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = lang.code;
+        cb.checked = sel.includes(lang.code);
+        cb.addEventListener('change', () => {
+          const codes = getSelectedLanguages();
+          writeStoredLanguages(codes);
+          updateLangSummary();
+          if (IV.isRunning()) showError('Language change applies when you Stop then Start listening.');
+        });
+        label.appendChild(cb);
+        const txt = document.createElement('span');
+        txt.textContent = lang.native + (lang.native !== lang.name ? ' (' + lang.name + ')' : '');
+        label.appendChild(txt);
+        el.langList.appendChild(label);
+      });
+      updateLangSummary();
+    }
+
+    // Reconcile the hardcoded mirror with /api/health by code (backend wins for
+    // shared codes; backend-only added; frontend-only dropped).
+    function reconcileLanguages(backendList) {
+      if (Array.isArray(backendList) && backendList.length) {
+        langRegistry = backendList.map((b) => ({
+          code: b.code,
+          name: b.name || b.code,
+          native: b.native || b.name || b.code,
+          locale: b.locale || null,
+        }));
+      }
+      const avail = availableCodes();
+      let stored = readStoredLanguages() || ['en'];
+      stored = stored.filter((c) => avail.includes(c));
+      if (!stored.length) stored = ['en'];
+      buildLangDropdown(stored);
+    }
     let qaStarted = false;
     const cards = new Map();      // questionId -> { root, q, a, gen, err, expandBtn, retryBtn }
     let partialNode = null;       // live partial-transcript line
@@ -1062,14 +1165,34 @@
       el.error.textContent = msg;
     }
 
-    // Show the backend's configured speech locale (the interviewer language).
+    // Show the backend's configured speech locale (the interviewer language)
+    // and reconcile the language dropdown against the backend registry.
+    function renderLocaleMeta() {
+      const parts = [];
+      if (state.defaultSpeechLocale) parts.push(state.defaultSpeechLocale);
+      const n = getSelectedLanguages().length;
+      parts.push(n + (n === 1 ? ' language' : ' languages'));
+      el.locale.textContent = parts.join(' · ');
+    }
+    const state = { defaultSpeechLocale: null };
+
     async function loadHealth() {
       try {
-        const info = await IV.init(api.backendUrl);
-        if (info.speechLocale) el.locale.textContent = info.speechLocale;
-        if (info.openaiConfigured === false) {
-          showError('Backend has no OpenAI key set — answers will fail. Add OPENAI_API_KEY and restart the backend.');
+        let backendLangs = null;
+        try {
+          const h = await api.health();
+          if (h) {
+            if (h.default_speech_locale) state.defaultSpeechLocale = h.default_speech_locale;
+            if (Array.isArray(h.supported_languages)) backendLangs = h.supported_languages;
+            if (h.openai_configured === false) {
+              showError('Backend has no OpenAI key set — answers will fail. Add OPENAI_API_KEY and restart the backend.');
+            }
+          }
+        } catch (_) {
+          console.warn('interview: /api/health unreachable; using hardcoded language mirror.');
         }
+        reconcileLanguages(backendLangs);
+        renderLocaleMeta();
         healthLoaded = true;
       } catch (_) { /* non-fatal; locale label stays blank */ }
     }
@@ -1092,6 +1215,7 @@
         if (questionText && !c.q.querySelector('.q-text').textContent) {
           c.q.querySelector('.q-text').textContent = questionText;
         }
+        if (opts.language && !c.language) c.language = opts.language;
         return c;
       }
 
@@ -1141,7 +1265,7 @@
         a.textContent = '';
         const qtext = q.querySelector('.q-text').textContent || '';
         try {
-          const data = api.askText ? await api.askText(qtext, toneSelect.value, null) : null;
+          const data = api.askText ? await api.askText(qtext, toneSelect.value, null, c && c.language) : null;
           gen.classList.add('hidden');
           if (data && data.success) { a.textContent = data.answer || ''; maybeCollapse(c); }
           else { err.classList.remove('hidden'); err.textContent = (data && data.error) || 'Retry failed.'; }
@@ -1158,7 +1282,7 @@
       root.appendChild(actions);
       el.qa.insertBefore(root, el.qa.firstChild);
 
-      c = { root, q, a, gen, err, expandBtn, retryBtn };
+      c = { root, q, a, gen, err, expandBtn, retryBtn, language: opts.language || null };
       cards.set(questionId, c);
       return c;
     }
@@ -1194,13 +1318,19 @@
           if (el.transcript.querySelector('.muted')) el.transcript.innerHTML = '';
           const line = document.createElement('div');
           line.textContent = t.text;
+          if (t.language) {
+            const badge = document.createElement('span');
+            badge.className = 'qa-lang-badge';
+            badge.textContent = t.language;
+            line.appendChild(badge);
+          }
           el.transcript.appendChild(line);
         }
         el.transcript.scrollTop = el.transcript.scrollHeight;
       },
       onQuestionDetected: (q) => {
         showError('');
-        ensureCard(q.questionId, q.text, { category: q.category });
+        ensureCard(q.questionId, q.text, { category: q.category, language: q.language });
       },
       onAnswerStarted: (s) => {
         const c = ensureCard(s.questionId, '');
@@ -1240,7 +1370,10 @@
           showError(e.message || 'Error');
         }
       },
-      onSessionStarted: (s) => { if (s.speechLocale) el.locale.textContent = s.speechLocale; },
+      onSessionStarted: (s) => {
+        if (s.speechLocale) state.defaultSpeechLocale = s.speechLocale;
+        renderLocaleMeta();
+      },
       onDevicesChanged: () => {},
     };
 
@@ -1248,6 +1381,7 @@
       return Object.assign({
         backendUrl: api.backendUrl,
         tone: toneSelect.value,
+        languages: getSelectedLanguages(),
       }, callbacks);
     }
 
@@ -1289,7 +1423,12 @@
     // Keep tone in sync with the shared tone selector.
     toneSelect.addEventListener('change', () => { if (IV.isRunning()) IV.setTone(toneSelect.value); });
 
-    // Probe backend health (speech locale) when the Interview tab first opens.
+    // Build the dropdown immediately from the hardcoded mirror + stored
+    // selection so it renders before the first /api/health reconcile.
+    buildLangDropdown(readStoredLanguages() || ['en']);
+
+    // Probe backend health (speech locale + language registry) when the
+    // Interview tab first opens.
     navs.interview.addEventListener('click', () => { if (!healthLoaded) loadHealth(); });
 
     // Clean teardown when the window is closing / reloading, or when the main
