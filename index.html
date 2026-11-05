@@ -341,6 +341,12 @@
         <summary class="act-btn" id="iv-lang-summary">Languages: EN</summary>
         <div class="iv-langs-list" id="iv-langs-list"></div>
       </details>
+      <!-- Resume (CV) document controls. The iv-cv-* prefix is deliberate:
+           #iv-resume above is the "Resume listening" playback control. -->
+      <input type="file" id="iv-cv-input" accept=".pdf,.docx,.txt" style="display:none;">
+      <button class="act-btn" id="iv-cv-btn" title="Upload a resume to set the interview context">📄 Upload Resume</button>
+      <span class="iv-meta" id="iv-cv-label">No resume</span>
+      <button class="act-btn" id="iv-cv-clear" title="Clear the loaded resume">✕</button>
       <span class="spacer"></span>
       <button class="act-btn" id="iv-clear" title="Clear the transcript and all Q&amp;A cards">🗑 Clear</button>
     </div>
@@ -1064,6 +1070,10 @@
       langs: document.getElementById('iv-langs'),
       langSummary: document.getElementById('iv-lang-summary'),
       langList: document.getElementById('iv-langs-list'),
+      cvInput: document.getElementById('iv-cv-input'),
+      cvBtn: document.getElementById('iv-cv-btn'),
+      cvLabel: document.getElementById('iv-cv-label'),
+      cvClear: document.getElementById('iv-cv-clear'),
     };
 
     let healthLoaded = false;
@@ -1382,6 +1392,7 @@
         backendUrl: api.backendUrl,
         tone: toneSelect.value,
         languages: getSelectedLanguages(),
+        candidateProfile: IV.getCandidateProfile(),
       }, callbacks);
     }
 
@@ -1422,6 +1433,49 @@
 
     // Keep tone in sync with the shared tone selector.
     toneSelect.addEventListener('change', () => { if (IV.isRunning()) IV.setTone(toneSelect.value); });
+
+    // ── Resume (CV) upload ────────────────────────────────────────────────
+    // The parsed profile is held ONLY in the InterviewMode JS state (session
+    // only — never localStorage) and applied on the next Stop->Start via the
+    // start frame's candidate_profile. A changed/cleared resume does NOT mutate
+    // a live session, so we note that it applies on (re)start.
+    function noteResumeApplies() {
+      if (IV.isRunning()) showError('Resume will apply when you (re)start listening.');
+    }
+    if (el.cvBtn && el.cvInput) {
+      el.cvBtn.addEventListener('click', () => el.cvInput.click());
+      el.cvInput.addEventListener('change', async () => {
+        const file = el.cvInput.files && el.cvInput.files[0];
+        if (!file) return;
+        if (!api.parseResume) { showError('Resume upload is unavailable.'); return; }
+        el.cvLabel.textContent = 'Parsing…';
+        try {
+          const res = await api.parseResume(file);
+          if (res && res.success) {
+            IV.setCandidateProfile(res.profile || '');
+            let label = 'Resume loaded (' + (res.chars || 0) + ' chars)';
+            if (res.truncated) label += ' (truncated)';
+            el.cvLabel.textContent = label;
+            noteResumeApplies();
+          } else {
+            el.cvLabel.textContent = 'No resume';
+            showError((res && res.error) || 'Could not parse resume.');
+          }
+        } catch (_) {
+          el.cvLabel.textContent = 'No resume';
+          showError('Backend unreachable — could not parse resume.');
+        } finally {
+          el.cvInput.value = '';   // allow re-selecting the same file
+        }
+      });
+    }
+    if (el.cvClear) {
+      el.cvClear.addEventListener('click', () => {
+        IV.setCandidateProfile('');
+        if (el.cvLabel) el.cvLabel.textContent = 'No resume';
+        noteResumeApplies();
+      });
+    }
 
     // Build the dropdown immediately from the hardcoded mirror + stored
     // selection so it renders before the first /api/health reconcile.

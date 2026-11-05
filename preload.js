@@ -57,6 +57,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return res.json();
   },
 
+  // Parse an uploaded resume (PDF/DOCX/TXT) into a candidate-profile string.
+  // Stateless on the backend: the parsed profile is held only in the renderer
+  // and sent on the /ws/interview start frame. `distill` (default true) asks
+  // the backend to LLM-summarize the resume; false returns capped raw text.
+  parseResume: async (file, distill = true) => {
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    fd.append('distill', String(distill));
+    const res = await fetch(`${BACKEND_URL}/api/resume/parse`, { method: 'POST', body: fd });
+    return res.json();
+  },
+
   // ── Backend REST helpers (gallery + caching, Phase 2b) ──────────────────
   listRecords: async () => {
     const res = await fetch(`${BACKEND_URL}/api/records`);
