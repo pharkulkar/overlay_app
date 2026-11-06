@@ -575,24 +575,37 @@
     setStatus('Thinking…', 'thinking');
     answerBody.innerHTML = '<span class="muted">Asking the assistant…</span>';
     try {
-      const data = api.askText
-        ? await api.askText(text, toneSelect.value, activeRecordId)
-        : null;
+      if (!api.askText) {
+        // The preload bridge did not load askText — this is NOT a backend
+        // problem; the renderer's electronAPI is missing/partial.
+        setStatus('Error', 'error');
+        answerBody.textContent = 'Internal: askText bridge unavailable (electronAPI not loaded). '
+          + 'backendUrl=' + (api.backendUrl || 'undefined');
+        console.error('[ask] api.askText is undefined; electronAPI keys =', Object.keys(api));
+        return;
+      }
+      const data = await api.askText(text, toneSelect.value, activeRecordId);
       if (data && data.success) {
         setStatus('Answer', 'ok');
         answerBody.textContent = data.answer || 'No answer returned.';
-        // Capture the record id (a manual question creates a new record).
         if (data.record_id) activeRecordId = data.record_id;
-        // Refresh history for this record so prior answers show up.
         if (activeRecordId && api.getRecord) {
           try { const rr = await api.getRecord(activeRecordId); renderHistory(rr && rr.history); } catch (_) {}
         }
         loadGallery();
       } else {
+        // Surface the REAL error from the backend instead of a generic string.
         setStatus('Error', 'error');
-        answerBody.textContent = (data && data.error) || 'Ask failed.';
+        const detail = (data && (data.error || JSON.stringify(data))) || 'no response body';
+        answerBody.textContent = 'Ask failed: ' + detail;
+        console.error('[ask] backend returned non-success:', data);
       }
-    } catch (_) { setStatus('Error', 'error'); answerBody.textContent = 'Backend unreachable.'; }
+    } catch (err) {
+      setStatus('Error', 'error');
+      answerBody.textContent = 'Ask request threw: ' + (err && err.message ? err.message : String(err))
+        + '  (backendUrl=' + (api.backendUrl || 'undefined') + ')';
+      console.error('[ask] fetch threw:', err);
+    }
   }
 
   document.getElementById('btn-ask').addEventListener('click', askCurrentText);
@@ -660,11 +673,24 @@
   }
 
   async function loadGallery() {
-    if (!api.listRecords) { galleryGrid.innerHTML = '<span class="muted">Backend unavailable.</span>'; return; }
+    if (!api.listRecords) {
+      // The preload bridge is missing listRecords — electronAPI didn't load.
+      // This is distinct from the backend being unreachable.
+      galleryGrid.innerHTML = '<span class="muted">electronAPI bridge not loaded '
+        + '(listRecords missing). Keys: ' + Object.keys(api).join(', ') + '</span>';
+      console.error('[gallery] api.listRecords undefined; electronAPI keys =', Object.keys(api));
+      return;
+    }
     galleryGrid.innerHTML = '<div class="muted">Loading…</div>';
     let data;
     try { data = await api.listRecords(); }
-    catch (_) { galleryGrid.innerHTML = '<span class="muted">Could not reach backend.</span>'; return; }
+    catch (err) {
+      galleryGrid.innerHTML = '<span class="muted">Could not reach backend: '
+        + (err && err.message ? err.message : String(err))
+        + ' (backendUrl=' + (api.backendUrl || 'undefined') + ')</span>';
+      console.error('[gallery] listRecords threw:', err);
+      return;
+    }
 
     const records = (data && data.records) || [];
     if (!records.length) {
@@ -1393,6 +1419,7 @@
         tone: toneSelect.value,
         languages: getSelectedLanguages(),
         candidateProfile: IV.getCandidateProfile(),
+        vadConfig: api.vadConfig || null,   // env-tunable VAD timings (preload)
       }, callbacks);
     }
 

@@ -270,6 +270,34 @@ ipcMain.on('toggle-overlay-mode', (event, isMinimized) => {
   }
 });
 
+// Resolve interviewer-capture VAD timings from env + overlay.config.json and
+// return them to the (sandboxed) preload synchronously. Reading the file MUST
+// happen here in the main process — a sandboxed preload cannot require('fs').
+// Precedence: env var > overlay.config.json "vad" block > undefined (renderer
+// falls back to interview.js defaults). Only finite positive numbers pass.
+ipcMain.on('get-vad-config', (event) => {
+  const num = (v) => {
+    if (v === undefined || v === null || String(v).trim() === '') return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  let fileVad = {};
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'overlay.config.json'), 'utf8'));
+    if (cfg && typeof cfg.vad === 'object' && cfg.vad) fileVad = cfg.vad;
+  } catch (_) { /* no/invalid config file -> defaults */ }
+  const pick = (envName, key) => {
+    const e = num(process.env[envName]);
+    return e !== undefined ? e : num(fileVad[key]);
+  };
+  event.returnValue = {
+    silenceMs: pick('VAD_SILENCE_MS', 'silenceMs'),
+    minSpeechMs: pick('VAD_MIN_SPEECH_MS', 'minSpeechMs'),
+    maxUtterMs: pick('VAD_MAX_UTTER_MS', 'maxUtterMs'),
+    speechLevel: pick('VAD_SPEECH_LEVEL', 'speechLevel'),
+  };
+});
+
 // Overlay UI sets the active answer tone; applied to hotkey captures.
 ipcMain.on('set-tone', (event, tone) => {
   if (typeof tone === 'string' && tone) currentTone = tone;
@@ -332,16 +360,27 @@ function configureMediaPermissions() {
   //   - Windows: full system-audio loopback is supported.
   //   - macOS 13+: supported; the first use shows a system permission prompt.
   if (ses.setDisplayMediaRequestHandler) {
-    ses.setDisplayMediaRequestHandler((request, callback) => {
-      desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-        // 'loopback' = capture the system audio mix. Pair it with a screen
-        // video source because getDisplayMedia requires a video track; the
-        // renderer immediately drops the video track and keeps only audio.
+    // NOTE: on Electron 39+ (we ship 44), `audio: 'loopback'` is the NATIVE
+    // macOS 12.3+ / Windows 10+ system-audio capture path — no BlackHole / VB-
+    // CABLE / Stereo Mix driver required. We must NOT pass `{ useSystemPicker:
+    // false }` here: on macOS that option suppresses the audio-sharing path and
+    // yields a video-only stream (silent capture). Leaving options unset lets
+    // the OS grant the loopback audio track alongside the screen video source
+    // (the renderer immediately drops the video track and keeps only audio).
+    ses.setDisplayMediaRequestHandler(async (request, callback) => {
+      try {
+        const sources = await desktopCapturer.getSources({ types: ['screen'] });
+        if (!sources || !sources.length) {
+          console.error('[capture] No screen sources available; cannot grant loopback audio.');
+          callback({});
+          return;
+        }
         callback({ video: sources[0], audio: 'loopback' });
-      }).catch(() => {
+      } catch (err) {
+        console.error('[capture] setDisplayMediaRequestHandler failed:', err);
         callback({});
-      });
-    }, { useSystemPicker: false });
+      }
+    });
   }
 }
 

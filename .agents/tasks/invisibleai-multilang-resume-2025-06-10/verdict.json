@@ -1,0 +1,16 @@
+{
+  "verdict": "APPROVED",
+  "summary": "Both features are implemented faithfully to design.md across the two repos and the recorded verification holds on re-run. FEAT-001 expands SUPPORTED_LANGUAGES to the 20-code registry (backend interview_config.py + frontend interview.js mirror in lockstep), threads a user-selected language set through /ws/audio (transcribe_detailed + set-constrained detect_language fallback, honest true_lang vs coerced answer_lang split), through /ws/interview and InterviewSession (per-turn Question.language, session not locked), and fixes non-Latin question detection (terminal marks ？؟। added in _looks_incomplete, heuristic_detect scoring, and InterviewSession._looks_complete; non-en LLM-unavailable lenient floor pins confidence to max(base, 0.6)). FEAT-002 adds the stateless POST /api/resume/parse route with the pinned validation order (400/413/415 then 422-before-distill), the new resume_parser.py (BytesIO only, no disk/DB), pinned char budgets, pre-truncation chars, and iv-cv-* frontend controls that fill candidate_profile on the next Stop->Start only. Every new wire field is optional and absent==today: the Audio tab /ws/audio path and audio.js (speaker/text only), the Answer tab askText 3-arg path, and the bare-{} start all reproduce today's behavior. Re-ran verification: `import server` ok with no key, 107 backend pytest pass (incl. non-Latin 0.6 floor, hi->en multi-language carry, out-of-set coercion, resume route 413/415/422/success), `node --check interview.js preload.js` ok, `npm test` 16/16. No .env/app.db/screenshots/logs touched; both repos on ObservationsAtul with the work in two local commits each.",
+  "findings": [
+    {
+      "severity": "NIT",
+      "where": "screen_shot/resume_parser.py:distill",
+      "detail": "When the LLM is configured and ai_module.ask() returns an empty/whitespace string, distill returns (\"\", True, truncated) and the route responds success:true with an empty profile instead of falling back to the capped raw text. Harmless (candidate_profile would just be empty, same as no resume) and the empty-text 422 guard only covers extraction, not distillation output. Optional hardening: treat a blank distilled result as a trigger for the raw-text fallback, e.g. `if not (profile or '').strip(): fall through to raw[:RESUME_RAW_PROFILE_BUDGET]`."
+    },
+    {
+      "severity": "NIT",
+      "where": "overlay_app/index.html:loadHealth",
+      "detail": "loadHealth() now reads health directly via api.health() (returning snake_case fields openai_configured/default_speech_locale/supported_languages, which match the backend) instead of the design's reference to IV.init() reading h.default_language/h.default_speech_locale. Behavior is correct and verified against the real /api/health response shape, but it diverges from the design's wording that init() stays the probe; worth a one-line design note so the two don't drift. No functional impact."
+    }
+  ]
+}

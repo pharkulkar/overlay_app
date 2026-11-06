@@ -55,6 +55,9 @@
   const SUPPORTED_LANGUAGES = [
     { code: 'en', name: 'English', native: 'English', locale: 'en-IN' },
     { code: 'hi', name: 'Hindi', native: 'हिन्दी', locale: 'hi-IN' },
+    // Hinglish: Hindi-English code-mixing in Roman script. Not an ISO language;
+    // a pseudo-code the backend handles specially. Placed beside Hindi.
+    { code: 'hing', name: 'Hinglish', native: 'Hinglish', locale: 'hi-IN' },
     { code: 'mr', name: 'Marathi', native: 'मराठी', locale: 'mr-IN' },
     { code: 'zh', name: 'Chinese', native: '中文', locale: 'zh-CN' },
     { code: 'es', name: 'Spanish', native: 'Español', locale: 'es-ES' },
@@ -183,6 +186,13 @@
   // computes the RMS level each animation frame, reports it for the UI meter,
   // AND decides when the interviewer has STARTED and STOPPED speaking so we can
   // segment on whole utterances (end-of-question) instead of fixed timers.
+  // If capture starts but we never hear ANY sound for this long, the most
+  // likely cause on macOS is that the system-audio loopback track was granted
+  // but carries silence (audio-sharing not enabled in the capture prompt, or
+  // the meeting audio is routed to a device the loopback can't tap). We warn
+  // ONCE so the user gets feedback instead of an indefinite "Listening…".
+  const SILENCE_WARN_MS = 12000;
+
   function startMetering(stream) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
@@ -193,6 +203,11 @@
     const data = new Uint8Array(analyser.fftSize);
     state.ctx = ctx; state.analyser = analyser;
 
+    // Silence-watchdog bookkeeping (reset on each metering start).
+    state.meterStartTs = performance.now();
+    state.everHeardSound = false;
+    state.silenceWarned = false;
+
     const tick = () => {
       if (!state.analyser) return;
       analyser.getByteTimeDomainData(data);
@@ -200,6 +215,24 @@
       for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
       const level = Math.min(1, Math.sqrt(sum / data.length) * 2.2);
       emit('onLevel', state.paused ? 0 : level);
+
+      // Any non-trivial level means audio IS flowing — clear the watchdog.
+      if (level >= 0.02) state.everHeardSound = true;
+
+      // Fire the one-time silence warning if we've heard nothing at all.
+      if (!state.everHeardSound && !state.silenceWarned && !state.paused
+          && (performance.now() - state.meterStartTs) >= SILENCE_WARN_MS) {
+        state.silenceWarned = true;
+        emit('onError', {
+          message: 'No system audio detected yet. In the macOS screen-capture '
+            + 'prompt, make sure "audio" sharing is enabled, and check that the '
+            + 'call audio plays through your system output (not only headphones '
+            + 'the capture can\'t reach). Running the built app (not a dev run) '
+            + 'is the most reliable for loopback.',
+          recoverable: true,
+        });
+      }
+
       if (!state.paused) vadStep(level);
       state.raf = requestAnimationFrame(tick);
     };
@@ -212,11 +245,36 @@
   // VAD_SILENCE_MS, we treat that as end-of-question and flush the buffered
   // audio as a single utterance to Whisper. A hard cap (VAD_MAX_UTTER_MS)
   // flushes a non-stop talker so very long answers still get processed.
-  const VAD_SPEECH_LEVEL = 0.055;   // RMS above this = "speaking"
-  const VAD_SILENCE_MS = 650;       // quiet this long after speech = end of question
-  const VAD_MIN_SPEECH_MS = 350;    // ignore blips shorter than this
-  const VAD_MAX_UTTER_MS = 15000;   // safety flush for a continuous talker
+  // VAD timings are DEFAULTS; they can be overridden per-session via start()
+  // opts (wired from env through preload's electronAPI.vadConfig) so interview
+  // responsiveness is tunable without editing source. Lowered silence (650->450)
+  // cuts response lag; the backend EOU window was lowered in tandem so the two
+  // "has the person finished?" guards no longer stack. Raise silence if it clips
+  // very slow/pausing speakers.
+  const VAD_DEFAULTS = Object.freeze({
+    speechLevel: 0.055,   // RMS above this = "speaking"
+    silenceMs: 450,       // quiet this long after speech = end of question
+    minSpeechMs: 350,     // ignore blips shorter than this
+    maxUtterMs: 15000,    // safety flush for a continuous talker
+  });
+  // Live, overridable copy used by the VAD loop (reset from VAD_DEFAULTS +
+  // opts.vadConfig on each start()).
+  let VAD_SPEECH_LEVEL = VAD_DEFAULTS.speechLevel;
+  let VAD_SILENCE_MS = VAD_DEFAULTS.silenceMs;
+  let VAD_MIN_SPEECH_MS = VAD_DEFAULTS.minSpeechMs;
+  let VAD_MAX_UTTER_MS = VAD_DEFAULTS.maxUtterMs;
   const VAD_PREROLL_MS = 300;       // keep a little audio before speech onset
+
+  // Apply per-session VAD overrides (only finite positive numbers win; anything
+  // else keeps the default). Called from start().
+  function applyVadConfig(cfg) {
+    cfg = cfg || {};
+    const pick = (v, def) => (typeof v === 'number' && isFinite(v) && v > 0 ? v : def);
+    VAD_SPEECH_LEVEL = pick(cfg.speechLevel, VAD_DEFAULTS.speechLevel);
+    VAD_SILENCE_MS = pick(cfg.silenceMs, VAD_DEFAULTS.silenceMs);
+    VAD_MIN_SPEECH_MS = pick(cfg.minSpeechMs, VAD_DEFAULTS.minSpeechMs);
+    VAD_MAX_UTTER_MS = pick(cfg.maxUtterMs, VAD_DEFAULTS.maxUtterMs);
+  }
 
   function vadStep(level) {
     const v = state.vad;
@@ -554,6 +612,9 @@
     async start(opts) {
       opts = opts || {};
       if (state.running) await this.stop();
+
+      // Apply any VAD timing overrides for this session (from env via preload).
+      applyVadConfig(opts.vadConfig);
 
       state.backendUrl = opts.backendUrl || null;
       state.tone = opts.tone || null;

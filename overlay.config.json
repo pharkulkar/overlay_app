@@ -1,0 +1,17 @@
+{
+  "_comment": "Overlay settings. Edit these values and relaunch the app — no bash env vars needed. An environment variable of the same name (e.g. VAD_SILENCE_MS) overrides the matching value here. Only finite positive numbers are used; a bad value falls back to the built-in default.",
+
+  "vad": {
+    "silenceMs": 450,
+    "minSpeechMs": 350,
+    "maxUtterMs": 15000,
+    "speechLevel": 0.055,
+
+    "_help": {
+      "silenceMs": "Quiet (ms) after the interviewer stops talking before we treat it as end-of-question. Lower = snappier responses, but may clip slow/pausing speakers. Default 450.",
+      "minSpeechMs": "Ignore speech bursts shorter than this (ms) — filters out coughs/clicks. Default 350.",
+      "maxUtterMs": "Safety flush (ms) for a non-stop talker so a very long answer still gets processed. Default 15000.",
+      "speechLevel": "RMS audio level (0..1) above which we count the input as speech. Raise if background noise triggers false starts; lower if quiet speech is missed. Default 0.055."
+    }
+  }
+}

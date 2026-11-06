@@ -1,0 +1,62 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "HIGH",
+      "title": "Non-Latin terminal-mark score (0.55) is below the detection threshold (0.6); core non-Latin detection silently drops questions on the LLM-unavailable path",
+      "location": "design.md Feature 1d + question_detector.py file-by-file entry; verified against question_detector.heuristic_detect (score += 0.55), interview_session._finalize_utterance (confidence >= detectionConfidenceThreshold), interview_config._DEFAULTS.detectionConfidenceThreshold == 0.6",
+      "problem": "A bare non-Latin question ending in ?/？/؟/। scores only 0.55 from the terminal mark (no English-lexicon tokens can match), so _finalize_utterance's >= 0.6 gate drops it. The 'never silently drop a non-English question' rule is contradicted whenever the LLM classifier path is not taken, which is exactly the offline/lenient-fallback case the design requires.",
+      "fix": "In the non-'en' path of QuestionDetector.detect, when the utterance is complete and ends in a terminal mark (? ？ ؟ । ! .) or meets minTranscriptChars, return confidence = max(heuristic, detectionConfidenceThreshold) (pin e.g. 0.6). Replace the lenient-fallback 'moderate confidence' wording with that concrete value and state it must be >= 0.6."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "Non-'en' 'force LLM path' interaction with base.complete and useLlmClassifier is unspecified",
+      "location": "design.md Feature 1d; verified against QuestionDetector.detect use_llm gate",
+      "problem": "The real use_llm gate requires useLlmClassifier, ai_module present, base.complete, and the ambiguous confidence band. The design says non-'en' bypasses the band but is silent on whether it also bypasses base.complete (would spend LLM calls on half-spoken fragments) and useLlmClassifier (would ignore the operator off-switch).",
+      "fix": "Pin the gate: use_llm = useLlmClassifier and ai_module is not None and base.complete and (lang != 'en' or AMBIGUOUS_LOW <= base.confidence <= AMBIGUOUS_HIGH). Non-'en' drops only the confidence-band condition; it still honors useLlmClassifier and base.complete. State this in Feature 1d and the file-by-file entry."
+    },
+    {
+      "id": 3,
+      "severity": "MEDIUM",
+      "title": "Frontend start-frame capture test is not achievable as written: no exposed send seam, and freshSession never opens a socket",
+      "location": "design.md Testability 'Harness fix for frame capture'; verified against test/interview.test.js freshSession and interview.js ivSend/sttSend (private closures, lines 291/331)",
+      "problem": "Seeding state.ivWs/state.sttWs is necessary but not sufficient. The start frame is built inside start()/connectIvWs() (which open real sockets and call fetch, rejected by the sandbox), and ivSend/sttSend are module-private, so a test cannot trigger the send without invoking those networked functions.",
+      "fix": "Specify a testable seam: expose InterviewMode._sendStartFrame/_ivSend/_sttSend to assert the captured frame, OR route new WebSocket(...) through an injectable factory the sandbox stubs to return a capturing object with readyState=1 and stub fetch. Name the chosen seam in the design."
+    },
+    {
+      "id": 4,
+      "severity": "NIT",
+      "title": "Multi-language STT 'auto-detect' is unverifiable and slightly over-claimed",
+      "location": "design.md Feature 1b (2+ languages -> no hard hint)",
+      "problem": "Multi-language correctness is asserted to rely on STT auto-detect, which is model-dependent and unverifiable offline.",
+      "fix": "Add one sentence stating multi-language correctness rests on the classifier fallback whenever STT returns no in-set language, not on STT auto-detect."
+    },
+    {
+      "id": 5,
+      "severity": "NIT",
+      "title": "Resume distill truncation can drop later content with no user signal; char budgets are approximate",
+      "location": "design.md Feature 2b (~6000 / ~8000 chars)",
+      "problem": "Resumes commonly exceed 6000 chars; the tail is dropped before the LLM sees it and nothing tells the user. Budgets are given as '~' approximations.",
+      "fix": "Pin the budgets as named constants; have the response 'chars' reflect pre-truncation extracted length and optionally return truncated:true so the UI can note it."
+    },
+    {
+      "id": 6,
+      "severity": "NIT",
+      "title": "distill form-field boolean parsing rule is contradictory for non-'true' strings",
+      "location": "design.md External input validation (distill field)",
+      "problem": "'default true' plus 'parsed as \"true\"' is ambiguous for present-but-non-'true' values.",
+      "fix": "Pin: distill = request.form.get('distill','true').lower() != 'false' (absent -> true; explicit 'false' -> false; anything else -> true). State it so route and test agree."
+    },
+    {
+      "id": 7,
+      "severity": "NIT",
+      "title": "api_ask reaches into ai._language_instruction (module-private) across a module boundary without a fallback",
+      "location": "design.md UI design + server.py file-by-file (api_ask language append)",
+      "problem": "Calling the leading-underscore private from server.py is brittle; a future rename breaks /api/ask at request time, and the design's own defensive-import pattern is not applied here.",
+      "fix": "Promote to a public ai.language_instruction(...) and call that, OR guard with getattr(ai_helper, '_language_instruction', None) and skip the append (English behavior) if absent. State which."
+    }
+  ],
+  "reviewDoc": "/Users/pranay/Desktop/Pranay/Projects/In-Queue/overlay_app/.agents/tasks/invisibleai-multilang-resume-2025-06-10/design-review.md"
+}

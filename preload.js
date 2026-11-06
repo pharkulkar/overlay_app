@@ -6,9 +6,25 @@ const BACKEND_HOST = process.env.BACKEND_HOST || 'localhost';
 const BACKEND_PORT = process.env.BACKEND_PORT || '3000';
 const BACKEND_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 
+// Interviewer-capture VAD timings, tunable via env (VAD_SILENCE_MS, etc.) or
+// overlay.config.json. IMPORTANT: this preload runs SANDBOXED (Electron's
+// default), where require('fs')/require('path') THROW and abort the whole
+// preload — which previously wiped out the entire electronAPI bridge (making
+// askText/listRecords/backendUrl all undefined). So the file read lives in the
+// MAIN process; we fetch the resolved VAD config here via a sandbox-safe sync
+// IPC call. Only require('electron') is used in this preload.
+let VAD_CONFIG = {};
+try {
+  VAD_CONFIG = ipcRenderer.sendSync('get-vad-config') || {};
+} catch (_) { VAD_CONFIG = {}; }
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // Backend config
   backendUrl: BACKEND_URL,
+
+  // Interviewer-capture VAD timing overrides (from env; undefined keys keep
+  // interview.js defaults).
+  vadConfig: VAD_CONFIG,
   health: async () => {
     const res = await fetch(`${BACKEND_URL}/api/health`);
     return res.json();

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-invisibleai-multilang-resume",
+  "task_description": "Add two features in place across two tightly-coupled repos (Electron frontend at overlay_app, Flask backend at screen_shot): (1) accurate multi-language interviewer-voice detection with a multi-select language dropdown, per-utterance language detection, and answers that match the question's language; (2) session-only resume upload that drives interview context. Keep both apps working and the WebSocket+REST contract in lockstep; every new wire field/endpoint is optional and absent-equals-today. No new project, no rewrite, no framework swap, no git worktree. Finalized design at .agents/tasks/invisibleai-multilang-resume-2025-06-10/design.md is the source of truth.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}
