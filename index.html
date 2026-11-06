@@ -259,6 +259,72 @@
   .qa-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .qa-err { color: #ff3b30; font-size: 12px; margin-top: 6px; }
 
+  /* ── Gallery hover actions (Edit + Delete on every thumbnail) ────────── */
+  .g-actions {
+    position: absolute; top: 3px; right: 3px; display: none; gap: 4px;
+    z-index: 2;
+  }
+  .g-item:hover .g-actions { display: flex; }
+  .g-act {
+    font-size: 11px; line-height: 1; color: #fff; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 4px; padding: 2px 5px;
+    background: rgba(0,0,0,0.65);
+  }
+  .g-act:hover { background: rgba(255,255,255,0.18); }
+  .g-act.del { background: rgba(163,21,21,0.8); border-color: rgba(163,21,21,0.9); }
+  .g-act.del:hover { background: rgba(200,30,30,0.95); }
+
+  /* ── Edit modal (lives inside the content-protected overlay window) ──── */
+  #edit-modal {
+    position: fixed; inset: 0; z-index: 2000; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); -webkit-app-region: no-drag;
+  }
+  #edit-modal.open { display: flex; }
+  #edit-card {
+    width: min(92%, 980px); max-height: 90vh; display: flex; flex-direction: column; gap: 10px;
+    background: rgba(18,18,26,0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.16); border-radius: 14px; padding: 14px;
+    color: #e8e8ea; box-shadow: 0 10px 40px rgba(0,0,0,0.55); overflow: hidden;
+  }
+  #edit-head { display: flex; align-items: center; gap: 10px; }
+  #edit-title { font-size: 13px; font-weight: 600; color: #fff; }
+  #edit-ver-badge {
+    font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 1px 6px; border-radius: 999px; background: rgba(76,154,255,0.18); color: #9ec1ff;
+  }
+  #edit-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .edit-canvas-wrapper {
+    position: relative; overflow: hidden; max-height: 55vh;
+    display: flex; align-items: center; justify-content: center;
+    background: #000; border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+  }
+  /* Fit the WHOLE image in the frame (no scrolling): the canvas keeps its full
+     internal pixel resolution (crop stays sharp) but is DISPLAYED scaled down to
+     fit the wrapper. getCanvasCoords() already converts rendered size -> pixel
+     size, so crop/draw coordinates stay correct at any display scale. */
+  #edit-canvas {
+    display: block; cursor: crosshair;
+    max-width: 100%; max-height: 55vh;
+    width: auto; height: auto; object-fit: contain;
+  }
+  #edit-mode-draw.active, #edit-mode-crop.active {
+    background: rgba(76,154,255,0.9); color: #fff; border-color: rgba(76,154,255,0.9);
+  }
+  #edit-text {
+    width: 100%; min-height: 70px; max-height: 30vh; resize: vertical;
+    background: rgba(0,0,0,0.3); color: #f2f2f4;
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
+    padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.45; outline: none;
+  }
+  #edit-text:focus { border-color: rgba(76,154,255,0.6); }
+  #edit-answer {
+    background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px; padding: 12px; font-size: 14px; line-height: 1.55;
+    color: #f2f2f4; white-space: pre-wrap; word-break: break-word; min-height: 20px;
+  }
+  #edit-status { font-size: 11px; color: #7a7f88; }
+
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 </style>
@@ -455,6 +521,51 @@
   <div class="ctx-item" data-action="ask-context">💬 Ask with context</div>
   <div class="ctx-sep"></div>
   <div class="ctx-item" data-action="copy">⧉ Copy</div>
+</div>
+
+<!-- Edit modal — in-overlay (content-protected). Image records get the canvas
+     editor (draw/crop) + OCR + Get Answer; manual/audio records get a text
+     editor + Get Answer. -->
+<div id="edit-modal" class="interactive">
+  <div id="edit-card">
+    <div id="edit-head">
+      <span id="edit-title">Edit</span>
+      <span id="edit-ver-badge" class="hidden"></span>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="edit-close" title="Close">✕</button>
+    </div>
+
+    <div id="edit-body">
+      <!-- Image editor (shown only for screenshot records) -->
+      <div id="edit-image-tools" class="hidden">
+        <div class="actions" style="margin-bottom:8px;">
+          <button class="act-btn active" id="edit-mode-draw">✏️ Draw</button>
+          <button class="act-btn" id="edit-mode-crop">✂️ Crop Area</button>
+          <button class="act-btn" id="edit-apply-crop">Apply Crop</button>
+          <button class="act-btn" id="edit-reset">↺ Reset Image</button>
+        </div>
+        <div class="edit-canvas-wrapper">
+          <canvas id="edit-canvas"></canvas>
+        </div>
+        <div class="actions" style="margin-top:8px;">
+          <button class="act-btn" id="edit-ocr">⚡ Perform OCR / Get text from image</button>
+        </div>
+      </div>
+
+      <!-- Extracted / editable text (both image and text records) -->
+      <div class="zone-label" id="edit-text-label">Extracted text (edit, then Get Answer)</div>
+      <textarea id="edit-text" placeholder="Text appears here after OCR, or edit the question text."></textarea>
+
+      <div class="actions">
+        <button class="act-btn" id="edit-get-answer">➤ Get Answer</button>
+        <span class="spacer"></span>
+        <span id="edit-status"></span>
+      </div>
+
+      <div class="zone-label">Answer</div>
+      <div id="edit-answer"><span class="muted">The answer will appear here after you press Get Answer.</span></div>
+    </div>
+  </div>
 </div>
 
 <!-- Floating dot (S0) -->
@@ -707,20 +818,25 @@
         const answered = r.status === 'answered' && r.answer;
         const badge = answered ? '✓' : (r.status === 'error' ? '!' : '○');
         const color = answered ? '#4cd964' : (r.status === 'error' ? '#ff3b30' : '#9a9fa8');
+        const esc = (s) => (s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
         let thumb;
         if (r.source_type === 'audio') {
-          thumb = `<div class="g-audio">🎙</div>`;
+          // Show the transcribed question text as the title (like manual
+          // records), prefixed with the mic marker, instead of a bare icon.
+          const snippet = esc(r.extracted_text || 'Voice question').slice(0, 60);
+          thumb = `<div class="g-text">🎙 ${snippet}</div>`;
         } else if (r.source_type === 'manual') {
-          const snippet = (r.extracted_text || 'Question')
-            .replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]))
-            .slice(0, 60);
+          const snippet = esc(r.extracted_text || 'Question').slice(0, 60);
           thumb = `<div class="g-text">💬 ${snippet}</div>`;
         } else {
           thumb = `<img src="${api.backendUrl}/api/records/${r.id}/thumb" onerror="this.style.display='none'"/>`;
         }
-        html += `<div class="g-item" data-id="${r.id}">${thumb}
+        html += `<div class="g-item" data-id="${r.id}" data-type="${r.source_type}">${thumb}
           <span class="g-badge" style="color:${color}">${badge}</span>
-          <span class="g-del" data-id="${r.id}" title="Delete">×</span></div>`;
+          <div class="g-actions">
+            <span class="g-act edit" data-id="${r.id}" data-type="${r.source_type}" title="Edit">✏️</span>
+            <span class="g-act del" data-id="${r.id}" title="Delete">×</span>
+          </div></div>`;
       }
       html += '</div>';
     }
@@ -728,16 +844,25 @@
 
     galleryGrid.querySelectorAll('.g-item').forEach((el) => {
       el.addEventListener('click', (e) => {
-        if (e.target.classList.contains('g-del')) return;
+        // Hover-action buttons handle their own clicks.
+        if (e.target.closest('.g-actions')) return;
         openRecord(el.getAttribute('data-id'));
       });
     });
-    galleryGrid.querySelectorAll('.g-del').forEach((el) => {
+    // Delete (unified hover action for ALL record types).
+    galleryGrid.querySelectorAll('.g-act.del').forEach((el) => {
       el.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (!confirm('Delete this capture?')) return;
         await api.deleteRecord(el.getAttribute('data-id'));
         loadGallery();
+      });
+    });
+    // Edit (hover action for ALL record types; routed by source_type).
+    galleryGrid.querySelectorAll('.g-act.edit').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (window.openEditModal) window.openEditModal(el.getAttribute('data-id'), el.getAttribute('data-type'));
       });
     });
   }
@@ -789,6 +914,263 @@
     setStatus('Edit the text, then press Ask', 'idle');
     answerBody.innerHTML = '<span class="muted">Review the extracted text above, then press ➤ Ask.</span>';
   }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Gallery edit modal — image editor (draw/crop) + OCR + answer, or a text
+  // editor (+ answer) for manual/audio records. Lives inside this content-
+  // protected overlay window, so it stays hidden from screen sharing.
+  // ══════════════════════════════════════════════════════════════════════
+  (function initEditModal() {
+    const modal = document.getElementById('edit-modal');
+    const card = document.getElementById('edit-card');
+    const titleEl = document.getElementById('edit-title');
+    const verBadge = document.getElementById('edit-ver-badge');
+    const imageTools = document.getElementById('edit-image-tools');
+    const textLabel = document.getElementById('edit-text-label');
+    const textArea = document.getElementById('edit-text');
+    const answerEl = document.getElementById('edit-answer');
+    const statusEl = document.getElementById('edit-status');
+    const btnClose = document.getElementById('edit-close');
+    const btnDraw = document.getElementById('edit-mode-draw');
+    const btnCrop = document.getElementById('edit-mode-crop');
+    const btnApplyCrop = document.getElementById('edit-apply-crop');
+    const btnReset = document.getElementById('edit-reset');
+    const btnOcr = document.getElementById('edit-ocr');
+    const btnGetAnswer = document.getElementById('edit-get-answer');
+    const canvas = document.getElementById('edit-canvas');
+
+    // Modal/editor state.
+    let ctx = null;
+    let originalImage = null;
+    let currentMode = 'draw';          // 'draw' | 'crop'
+    let isDragging = false;
+    let cropStart = { x: 0, y: 0 };
+    let cropEnd = { x: 0, y: 0 };
+    let savedCanvasState = null;
+    // The record the modal is currently acting on. After OCR this becomes the
+    // NEW record returned by /api/ocr-only (the new version).
+    let editRecordId = null;
+    let editSourceType = null;         // original record's source_type
+    let sourceExtractedText = '';      // original text (for version labelling)
+
+    function setStatus(msg) { statusEl.textContent = msg || ''; }
+
+    function isImageType(st) {
+      return st === 'screenshot-full' || st === 'screenshot-region' ||
+        (st && st.indexOf('screenshot') === 0);
+    }
+
+    function closeModal() {
+      modal.classList.remove('open');
+      // Release the (potentially large) canvas + image references.
+      originalImage = null;
+      savedCanvasState = null;
+      if (ctx && canvas.width) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    btnClose.addEventListener('click', closeModal);
+    // Backdrop click (but not clicks inside the card) closes.
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    // Escape closes — capture phase so it doesn't disturb other handlers.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('open')) { e.stopPropagation(); closeModal(); }
+    }, true);
+
+    // ── Canvas editor (ported from the backend GALLERY_TEMPLATE) ──────────
+    function setMode(mode) {
+      currentMode = mode;
+      btnDraw.classList.toggle('active', mode === 'draw');
+      btnCrop.classList.toggle('active', mode === 'crop');
+    }
+    function resetEditor() {
+      if (!originalImage) return;
+      canvas.width = originalImage.width;
+      canvas.height = originalImage.height;
+      ctx.drawImage(originalImage, 0, 0);
+      setMode('draw');
+    }
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+    }
+    canvas.addEventListener('mousedown', (e) => {
+      if (!originalImage) return;
+      isDragging = true;
+      const pos = getCanvasCoords(e);
+      if (currentMode === 'draw') {
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+      } else if (currentMode === 'crop') {
+        cropStart = pos; cropEnd = pos;
+        savedCanvasState = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      }
+    });
+    canvas.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const pos = getCanvasCoords(e);
+      if (currentMode === 'draw') {
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = '#ff0055';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      } else if (currentMode === 'crop') {
+        cropEnd = pos;
+        ctx.putImageData(savedCanvasState, 0, 0);
+        ctx.strokeStyle = '#4c9aff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.strokeRect(cropStart.x, cropStart.y, cropEnd.x - cropStart.x, cropEnd.y - cropStart.y);
+        ctx.setLineDash([]);
+      }
+    });
+    canvas.addEventListener('mouseup', () => { isDragging = false; });
+
+    function applyCrop() {
+      if (currentMode !== 'crop' || !originalImage) return;
+      const x = Math.min(cropStart.x, cropEnd.x);
+      const y = Math.min(cropStart.y, cropEnd.y);
+      const w = Math.abs(cropEnd.x - cropStart.x);
+      const h = Math.abs(cropEnd.y - cropStart.y);
+      if (w < 10 || h < 10) { setStatus('Select a larger area to crop.'); return; }
+      const croppedData = ctx.getImageData(x, y, w, h);
+      canvas.width = w;
+      canvas.height = h;
+      ctx.putImageData(croppedData, 0, 0);
+      setMode('draw');
+      setStatus('Cropped. Run OCR to save this as a new version.');
+    }
+
+    btnDraw.addEventListener('click', () => setMode('draw'));
+    btnCrop.addEventListener('click', () => setMode('crop'));
+    btnApplyCrop.addEventListener('click', applyCrop);
+    btnReset.addEventListener('click', () => { resetEditor(); setStatus('Reset to original image.'); });
+
+    // Best-effort version label: count existing records whose extracted_text
+    // starts with the same prefix as this source, then append V1/V2/… The new
+    // OCR record IS the new version (a distinct Gallery entry); this only adds
+    // a visible marker in the modal title.
+    async function deriveVersionLabel() {
+      const base = (sourceExtractedText || '').trim().slice(0, 40);
+      if (!base || !api.listRecords) return '';
+      try {
+        const data = await api.listRecords();
+        const recs = (data && data.records) || [];
+        let count = 0;
+        for (const r of recs) {
+          const t = (r.extracted_text || '').trim().slice(0, 40);
+          if (t && t === base) count += 1;
+        }
+        // `count` includes the source + any prior edits; the next version #
+        // is the number of existing matches (source counts as V0's base).
+        return 'V' + Math.max(1, count);
+      } catch (_) { return ''; }
+    }
+
+    // ── Perform OCR on the CURRENT canvas state -> new record ─────────────
+    btnOcr.addEventListener('click', async () => {
+      if (!api.ocrImage) { setStatus('OCR bridge unavailable.'); return; }
+      if (!canvas.width || !canvas.height) { setStatus('No image to OCR.'); return; }
+      setStatus('Running OCR…');
+      btnOcr.disabled = true;
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const data = await api.ocrImage(dataUrl, 'screenshot-region');
+        if (data && data.success) {
+          // The new record IS the new version.
+          editRecordId = data.record_id;
+          editSourceType = 'screenshot-region';
+          textArea.value = data.extracted_text || '';
+          const label = await deriveVersionLabel();
+          if (label) { verBadge.textContent = label; verBadge.classList.remove('hidden'); }
+          setStatus('OCR complete — saved as a new version. Edit the text, then Get Answer.');
+          // Refresh the grid in the background so the new entry appears.
+          loadGallery();
+        } else {
+          setStatus('OCR failed: ' + ((data && data.error) || 'unknown error'));
+        }
+      } catch (err) {
+        setStatus('OCR request failed: ' + (err && err.message ? err.message : String(err)));
+      } finally {
+        btnOcr.disabled = false;
+      }
+    });
+
+    // ── Get Answer (image or text records) ────────────────────────────────
+    btnGetAnswer.addEventListener('click', async () => {
+      const text = (textArea.value || '').trim();
+      if (!text) { setStatus('Enter or OCR some text first.'); return; }
+      if (!api.askText) { setStatus('Ask bridge unavailable.'); return; }
+      setStatus('Asking the assistant…');
+      answerEl.innerHTML = '<span class="muted">Thinking…</span>';
+      btnGetAnswer.disabled = true;
+      try {
+        const data = await api.askText(text, toneSelect.value, editRecordId);
+        if (data && data.success) {
+          answerEl.textContent = data.answer || 'No answer returned.';
+          if (data.record_id) editRecordId = data.record_id;
+          setStatus('Answer ready.');
+          loadGallery();
+        } else {
+          answerEl.innerHTML = '';
+          setStatus('Ask failed: ' + ((data && data.error) || 'unknown error'));
+        }
+      } catch (err) {
+        answerEl.innerHTML = '';
+        setStatus('Ask request failed: ' + (err && err.message ? err.message : String(err)));
+      } finally {
+        btnGetAnswer.disabled = false;
+      }
+    });
+
+    // ── Open the modal for a record (routed by source_type) ───────────────
+    async function openEditModal(id, sourceType) {
+      editRecordId = id;
+      editSourceType = sourceType;
+      sourceExtractedText = '';
+      verBadge.classList.add('hidden');
+      verBadge.textContent = '';
+      answerEl.innerHTML = '<span class="muted">The answer will appear here after you press Get Answer.</span>';
+      textArea.value = '';
+      setStatus('Loading…');
+      modal.classList.add('open');
+
+      // Load the record's text (and any existing answer) for both types.
+      if (api.getRecord) {
+        try {
+          const rr = await api.getRecord(id);
+          if (rr && rr.success && rr.record) {
+            sourceExtractedText = rr.record.extracted_text || '';
+            textArea.value = sourceExtractedText;
+            if (rr.record.answer) answerEl.textContent = rr.record.answer;
+          }
+        } catch (_) { /* non-fatal; user can still edit */ }
+      }
+
+      if (isImageType(sourceType)) {
+        // Image editor flow.
+        titleEl.textContent = 'Edit image';
+        imageTools.classList.remove('hidden');
+        textLabel.textContent = 'Extracted text (run OCR, then Get Answer)';
+        ctx = canvas.getContext('2d');
+        originalImage = new Image();
+        originalImage.crossOrigin = 'anonymous';
+        originalImage.onload = () => { resetEditor(); setStatus('Draw or crop, then Perform OCR.'); };
+        originalImage.onerror = () => { setStatus('Could not load the image for this record.'); };
+        originalImage.src = `${api.backendUrl}/api/records/${id}/image`;
+      } else {
+        // Text editor flow (manual / audio — no image).
+        titleEl.textContent = (sourceType === 'audio') ? 'Edit voice question' : 'Edit question';
+        imageTools.classList.add('hidden');
+        textLabel.textContent = 'Question text (edit, then Get Answer)';
+        setStatus('Edit the text, then Get Answer.');
+      }
+    }
+
+    // Expose for the gallery grid wiring.
+    window.openEditModal = openEditModal;
+  })();
 
   // ── Audio capture (Phase 4) ─────────────────────────────
   const devMe = document.getElementById('dev-me');

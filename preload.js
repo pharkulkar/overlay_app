@@ -94,6 +94,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const res = await fetch(`${BACKEND_URL}/api/records/${id}`);
     return res.json();
   },
+  // OCR an edited/cropped image. Creates a NEW record on the backend (the
+  // "new version" Gallery entry) with the posted image saved to disk and
+  // OCR'd. Returns { success, record_id, extracted_text }.
+  ocrImage: async (dataUrl, sourceType = 'screenshot-region') => {
+    const res = await fetch(`${BACKEND_URL}/api/ocr-only`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl, source_type: sourceType }),
+    });
+    return res.json();
+  },
   solveRecord: async (id, force = false, tone = null) => {
     const res = await fetch(`${BACKEND_URL}/api/solve`, {
       method: 'POST',
