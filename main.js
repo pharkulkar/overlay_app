@@ -28,6 +28,8 @@ let selectionWindow;
 
 // Current answer tone (set by the overlay UI; applied to captures).
 let currentTone = process.env.ANSWER_TONE || 'concise';
+// Capture mode: 'ocr' (default, local OCR) | 'vision' (send image to OpenAI).
+let captureMode = 'ocr';
 
 // ── Overlay window ─────────────────────────────────────────────────────────
 
@@ -36,8 +38,14 @@ const WINDOW_STATE_FILE = path.join(app.getPath('userData'), 'overlay-window.jso
 function loadWindowState() {
   try { return JSON.parse(fs.readFileSync(WINDOW_STATE_FILE, 'utf8')); } catch (_) { return null; }
 }
+// True while the overlay is shrunk into the small solution panel. The panel's
+// size/position must NOT be saved as the window state, or the next launch would
+// open at panel size (so saveWindowState is a no-op while compact).
+let overlayCompact = false;
+
 function saveWindowState() {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  if (overlayCompact) return;
   try {
     const b = overlayWindow.getBounds();
     fs.writeFileSync(WINDOW_STATE_FILE, JSON.stringify(b));
@@ -110,7 +118,7 @@ async function captureFullScreen() {
   const display = screen.getDisplayNearestPoint(point);
   const { thumbnail } = await captureDisplay(display);
   const dataUrl = thumbnail.toDataURL();
-  await sendToSolve(dataUrl, 'screenshot-full');
+  await routeCapture(dataUrl, 'screenshot-full');
 }
 
 /**
@@ -135,7 +143,7 @@ async function captureRegion(display, rect) {
 
   const cropped = thumbnail.crop(cropRect);
   const dataUrl = cropped.toDataURL();
-  await sendToSolve(dataUrl, 'screenshot-region');
+  await routeCapture(dataUrl, 'screenshot-region');
 }
 
 // ── Region selection overlay window ─────────────────────────────────────────
@@ -214,6 +222,20 @@ ipcMain.on('region-cancelled', () => {
 
 // Capture -> OCR ONLY. The overlay shows the editable extracted text; the
 // user reviews/edits it and presses Ask to get an answer (/api/ask).
+// Route a finished capture by the user's capture mode. 'ocr' keeps the
+// original local-OCR flow untouched.
+function routeCapture(dataUrl, sourceType) {
+  if (captureMode === 'vision') return deliverVisionCapture(dataUrl, sourceType);
+  return sendToSolve(dataUrl, sourceType);
+}
+// Vision mode: hand the image to the renderer, which shows the send popup.
+// Main only un-hides the window; the renderer owns dot/expanded state and
+// expands itself (avoids a double-resize race).
+function deliverVisionCapture(dataUrl, sourceType) {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  if (!overlayWindow.isVisible()) overlayWindow.show();
+  sendToOverlay('vision-capture', { dataUrl, sourceType });
+}
 async function sendToSolve(dataUrl, sourceType) {
   sendToOverlay('solve-status', { status: 'ocr' });
   try {
@@ -298,11 +320,49 @@ ipcMain.on('get-vad-config', (event) => {
   };
 });
 
+// ── Small solution panel ─────────────────────────────────────────────────────
+// "Pop out" shrinks THIS window (same renderer, same content protection, still
+// always-on-top) to a small panel in the top-right of the current display, so
+// the rest of the screen is free for typing the solution elsewhere. Turning it
+// off restores the exact previous bounds. Kept separate from the dot's
+// expandedBounds so the two features never overwrite each other's state.
+const COMPACT_W = 460;
+const COMPACT_H = 380;
+let preCompactBounds = null;
+
+ipcMain.on('set-compact-mode', (event, on) => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  if (on) {
+    if (overlayCompact) return;
+    preCompactBounds = overlayWindow.getBounds();
+    overlayCompact = true;
+    const wa = screen.getDisplayMatching(preCompactBounds).workArea;
+    const margin = 16;
+    overlayWindow.setBounds({
+      x: Math.round(wa.x + wa.width - COMPACT_W - margin),
+      y: Math.round(wa.y + margin),
+      width: COMPACT_W,
+      height: COMPACT_H,
+    });
+  } else {
+    if (!overlayCompact) return;
+    overlayCompact = false;
+    if (preCompactBounds && preCompactBounds.width && preCompactBounds.height) {
+      overlayWindow.setBounds(preCompactBounds);
+    }
+    preCompactBounds = null;
+  }
+});
+
 // Overlay UI sets the active answer tone; applied to hotkey captures.
 ipcMain.on('set-tone', (event, tone) => {
   if (typeof tone === 'string' && tone) currentTone = tone;
 });
 
+// Overlay UI sets the capture mode ('ocr' | 'vision'); anything else ignored.
+ipcMain.on('set-capture-mode', (event, mode) => {
+  if (mode === 'ocr' || mode === 'vision') captureMode = mode;
+});
 // NOTE: the transcript "Ask" menu is now drawn as an in-overlay HTML menu
 // inside the content-protected overlay window (see index.html). A native
 // Electron Menu.popup() renders in an OS surface that is NOT covered by
@@ -311,17 +371,29 @@ ipcMain.on('set-tone', (event, tone) => {
 
 // ── Global shortcuts ─────────────────────────────────────────────────────────
 
-function registerShortcuts() {
-  globalShortcut.register(HOTKEY_CAPTURE_FULL, () => {
-    captureFullScreen().catch((err) => {
-      console.error('Full capture failed:', err);
-      sendToOverlay('solve-error', { error: String(err.message || err) });
-    });
+// Shared entry points: the global hotkeys AND the on-screen overlay buttons both
+// call these, so a click and a keypress always behave identically (local OCR or
+// the vision popup, per the current capture mode).
+function triggerFullCapture() {
+  captureFullScreen().catch((err) => {
+    console.error('Full capture failed:', err);
+    sendToOverlay('solve-error', { error: String(err.message || err) });
   });
+}
+function triggerRegionCapture() {
+  if (!selectionWindow) openRegionSelector();
+}
 
-  globalShortcut.register(HOTKEY_CAPTURE_REGION, () => {
-    if (!selectionWindow) openRegionSelector();
-  });
+// Overlay buttons -> same capture paths as the hotkeys. Only the two known
+// kinds are accepted; anything else is ignored.
+ipcMain.on('trigger-capture', (event, kind) => {
+  if (kind === 'full') triggerFullCapture();
+  else if (kind === 'region') triggerRegionCapture();
+});
+
+function registerShortcuts() {
+  globalShortcut.register(HOTKEY_CAPTURE_FULL, triggerFullCapture);
+  globalShortcut.register(HOTKEY_CAPTURE_REGION, triggerRegionCapture);
 
   globalShortcut.register(HOTKEY_TOGGLE_OVERLAY, () => {
     if (!overlayWindow) return;

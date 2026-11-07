@@ -325,6 +325,72 @@
   }
   #edit-status { font-size: 11px; color: #7a7f88; }
 
+  /* ── Capture settings popover + vision send popup ───────────────────── */
+  #settings-pop {
+    position: fixed; top: 38px; right: 10px; z-index: 1500; width: min(86%, 300px);
+    background: rgba(18,18,26,0.97); border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 10px; padding: 10px 12px; color: #e8e8ea; font-size: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5); -webkit-app-region: no-drag;
+  }
+  #settings-pop.hidden { display: none; }
+  #settings-pop fieldset, #vision-popup fieldset { border: 0; margin: 0 0 6px; padding: 0; }
+  #settings-pop legend, #vision-popup legend { font-size: 11px; color: #9aa0aa; padding: 0 0 4px; }
+  #settings-pop label, #vision-popup fieldset label { display: block; padding: 3px 0; cursor: pointer; }
+  #vision-popup {
+    position: fixed; inset: 0; z-index: 2100; display: flex;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); -webkit-app-region: no-drag;
+  }
+  #vision-popup.hidden { display: none; }
+  #vp-card {
+    width: min(92%, 420px); display: flex; flex-direction: column; gap: 8px;
+    background: rgba(18,18,26,0.97); border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 12px; padding: 12px; color: #e8e8ea; font-size: 13px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.55);
+  }
+  #vp-title { font-weight: 600; color: #fff; }
+  .vp-strip { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0; }
+  .vp-thumb { position: relative; flex: 0 0 auto; width: 64px; height: 44px; }
+  .vp-thumb img {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.2); display: block;
+  }
+  .vp-rm {
+    position: absolute; top: -5px; right: -5px; width: 16px; height: 16px; padding: 0;
+    border-radius: 50%; border: 0; background: rgba(163,21,21,0.95); color: #fff;
+    font-size: 10px; line-height: 16px; cursor: pointer; -webkit-app-region: no-drag;
+  }
+  .vp-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .vp-actions .act-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .vp-error { font-size: 11px; color: #ffb4b4; min-height: 14px; word-break: break-word; }
+  #btn-settings:focus-visible, #settings-pop input:focus-visible, #vision-popup input:focus-visible,
+  #vision-popup button:focus-visible { outline: 2px solid rgba(76,154,255,0.9); outline-offset: 2px; }
+
+  /* ── Small solution panel (the whole window shrinks to this) ─────────── */
+  #compact-view {
+    position: fixed; inset: 0; z-index: 3000;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 10px; box-sizing: border-box; color: #e8e8ea;
+    background: rgba(18,18,26,0.96);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.16); border-radius: 14px;
+  }
+  #compact-head { display: flex; align-items: center; gap: 8px; }   /* drag handle */
+  #compact-title { flex: 1; font-size: 12px; font-weight: 600; color: #fff; }
+  #compact-body {
+    flex: 1; min-height: 0; overflow: auto; font-size: 13px; line-height: 1.5;
+    user-select: text; -webkit-user-select: text; cursor: text;
+  }
+  .cv-text { white-space: pre-wrap; word-break: break-word; margin: 0 0 8px; }
+  .cv-lang { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #7a7f88; margin: 0 0 3px; }
+  .cv-code {
+    margin: 0 0 8px; padding: 8px 10px; border-radius: 8px;
+    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.1);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px; line-height: 1.45; tab-size: 4;
+    white-space: pre; overflow-x: auto;   /* keep lines intact so it can be typed as-is */
+  }
+
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 </style>
@@ -343,6 +409,7 @@
       <button class="nav-btn" id="nav-audio">Audio</button>
     </div>
     <span class="spacer"></span>
+    <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">⚙︎</button>
     <button class="icon-btn" id="btn-minimize" title="Minimize to dot">—</button>
   </div>
 
@@ -364,8 +431,10 @@
     <div class="zone-label interactive" id="input-toggle" style="cursor:pointer; display:flex; align-items:center; gap:6px;">
       <span id="input-caret">▾</span> Extracted text (edit, then Ask)
     </div>
-    <textarea id="ocr-input" class="interactive" placeholder="Capture the screen (⌘⇧1 full · ⌘⇧2 region) — the extracted text appears here to edit, or type your own question."></textarea>
+    <textarea id="ocr-input" class="interactive" placeholder="Use the Capture buttons below (or ⌘⇧1 full · ⌘⇧2 region) — the extracted text appears here to edit, or type your own question."></textarea>
     <div class="actions interactive">
+      <button class="act-btn" id="btn-capture-full" title="Capture the whole screen (same as ⌘⇧1)">🖥 Capture screen</button>
+      <button class="act-btn" id="btn-capture-region" title="Drag to select an area (same as ⌘⇧2)">✂ Capture region</button>
       <button class="act-btn" id="btn-ask" title="Ask OpenAI with the text above">➤ Ask</button>
       <button class="act-btn" id="btn-clear-input" title="Clear the text box">Clear</button>
       <span class="spacer"></span>
@@ -386,6 +455,7 @@
     <div class="actions interactive">
       <button class="act-btn" id="btn-regenerate" title="Re-ask with the current text + tone">↻ Regenerate</button>
       <button class="act-btn" id="btn-copy">⧉ Copy answer</button>
+      <button class="act-btn" id="btn-popout" title="Show this solution in a small window you can type from">🗗 Pop out solution</button>
     </div>
 
     <!-- Previous answers for this record (newest first) -->
@@ -550,6 +620,21 @@
         <div class="actions" style="margin-top:8px;">
           <button class="act-btn" id="edit-ocr">⚡ Perform OCR / Get text from image</button>
         </div>
+        <!-- Send the image (as it is now, edited or not) straight to OpenAI vision. -->
+        <fieldset id="edit-vision-box" style="border:1px solid rgba(255,255,255,0.14); border-radius:8px; margin-top:8px; padding:8px 10px;">
+          <legend class="zone-label" style="padding:0 6px;">Or send the image straight to OpenAI</legend>
+          <div class="actions">
+            <label for="edit-vm-coding" style="font-size:12px; display:flex; align-items:center; gap:5px;">
+              <input type="radio" name="edit-vision-mode" id="edit-vm-coding" value="coding" checked> Coding solution
+            </label>
+            <label for="edit-vm-scenario" style="font-size:12px; display:flex; align-items:center; gap:5px;">
+              <input type="radio" name="edit-vision-mode" id="edit-vm-scenario" value="scenario"> Scenario-based solution
+            </label>
+            <span class="spacer"></span>
+            <button class="act-btn" id="edit-vision-send" title="Sends the image exactly as shown (with any crop or drawing) to OpenAI">🧠 Get solution from image</button>
+          </div>
+          <div class="muted" style="font-size:10px; margin-top:4px;">The image leaves your machine only when you press this button.</div>
+        </fieldset>
       </div>
 
       <!-- Extracted / editable text (both image and text records) -->
@@ -562,10 +647,53 @@
         <span id="edit-status"></span>
       </div>
 
-      <div class="zone-label">Answer</div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="zone-label">Answer</div>
+        <span class="spacer"></span>
+        <button class="act-btn" id="edit-popout" title="Show this solution in a small window you can type from">🗗 Pop out solution</button>
+      </div>
       <div id="edit-answer"><span class="muted">The answer will appear here after you press Get Answer.</span></div>
     </div>
   </div>
+</div>
+
+<!-- Capture settings popover (in-overlay so it stays content-protected) -->
+<div id="settings-pop" class="hidden interactive" role="dialog" aria-label="Capture settings">
+  <fieldset>
+    <legend>Capture mode</legend>
+    <label for="cm-ocr"><input type="radio" name="capture-mode" id="cm-ocr" value="ocr" checked> Local OCR (default)</label>
+    <label for="cm-vision"><input type="radio" name="capture-mode" id="cm-vision" value="vision"> Send image directly to OpenAI</label>
+  </fieldset>
+  <div class="muted" id="cm-note">Images are sent to OpenAI only in this mode, and only when you press Send.</div>
+</div>
+
+<!-- Vision send popup: shown after a hotkey capture in "vision" mode -->
+<div id="vision-popup" class="hidden interactive" role="dialog" aria-modal="true" aria-labelledby="vp-title">
+  <div id="vp-card">
+    <div id="vp-title">Send to OpenAI · <span id="vp-count"></span></div>
+    <div id="vp-strip" class="vp-strip" aria-label="Staged images"></div>
+    <fieldset>
+      <legend>Answer type</legend>
+      <label for="vm-coding"><input type="radio" name="vision-mode" id="vm-coding" value="coding" checked> Coding solution</label>
+      <label for="vm-scenario"><input type="radio" name="vision-mode" id="vm-scenario" value="scenario"> Scenario-based explanation</label>
+    </fieldset>
+    <div id="vp-msg" class="vp-error" role="status" aria-live="polite"></div>
+    <div class="vp-actions">
+      <button class="act-btn" id="vp-add">Add another image</button>
+      <button class="act-btn" id="vp-send">Send</button>
+      <button class="act-btn" id="vp-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Small solution panel: the window shrinks to this so the solution can be typed from.
+     The header drags the window; the toggle brings the full overlay back. -->
+<div id="compact-view" class="hidden" role="region" aria-label="Solution">
+  <div id="compact-head">
+    <span id="compact-title">Solution</span>
+    <button class="act-btn" id="compact-restore" title="Show the full overlay again">⤢ Full overlay</button>
+  </div>
+  <div id="compact-body" class="interactive"></div>
 </div>
 
 <!-- Floating dot (S0) -->
@@ -575,6 +703,8 @@
 
 <script src="audio.js"></script>
 <script src="interview.js"></script>
+<script src="vision-batch.js"></script>
+<script src="solution-format.js"></script>
 <script>
   const api = window.electronAPI || {};
 
@@ -666,11 +796,12 @@
     floatingDot.classList.remove('hidden');
     api.toggleOverlayMode && api.toggleOverlayMode(true);
   });
-  floatingDot.addEventListener('click', () => {
+  function expandOverlay() {
     floatingDot.classList.add('hidden');
     overlayCard.classList.remove('hidden');
     api.toggleOverlayMode && api.toggleOverlayMode(false);
-  });
+  }
+  floatingDot.addEventListener('click', expandOverlay);
 
   // ── Tone ────────────────────────────────────────────────
   toneSelect.addEventListener('change', () => {
@@ -721,6 +852,111 @@
 
   document.getElementById('btn-ask').addEventListener('click', askCurrentText);
   document.getElementById('btn-regenerate').addEventListener('click', askCurrentText);
+  // ══════════════════════════════════════════════════════════════════════
+  // Small solution panel. "Pop out solution" shrinks the whole window into a
+  // small always-on-top panel showing just the solution (code in monospace
+  // boxes), so it can be read while typing it elsewhere. "⤢ Full overlay"
+  // restores everything exactly as it was. Same window + same content
+  // protection, so it stays hidden from screen sharing.
+  // ══════════════════════════════════════════════════════════════════════
+  (function initSolutionPanel() {
+    const view = document.getElementById('compact-view');
+    const bodyEl = document.getElementById('compact-body');
+    const titleEl = document.getElementById('compact-title');
+    const restoreBtn = document.getElementById('compact-restore');
+    const editModalEl = document.getElementById('edit-modal');
+    const settingsPop = document.getElementById('settings-pop');
+    const SF = window.SolutionFormat;
+    let active = false;
+    let reopenEditModal = false;
+
+    // Build the panel content with DOM nodes + textContent (never innerHTML), so
+    // model output can never inject markup.
+    function render(text) {
+      bodyEl.textContent = '';
+      const segs = SF ? SF.splitSolution(text) : [{ type: 'text', content: text }];
+      segs.forEach((seg) => {
+        if (seg.type === 'code') {
+          if (seg.lang) {
+            const l = document.createElement('div');
+            l.className = 'cv-lang';
+            l.textContent = seg.lang;
+            bodyEl.appendChild(l);
+          }
+          const pre = document.createElement('pre');
+          pre.className = 'cv-code';
+          pre.textContent = seg.content;
+          bodyEl.appendChild(pre);
+        } else {
+          const p = document.createElement('div');
+          p.className = 'cv-text';
+          p.textContent = seg.content;
+          bodyEl.appendChild(p);
+        }
+      });
+      bodyEl.scrollTop = 0;
+    }
+
+    // Returns true when the panel opened. `title` is a short label for the header.
+    function open(text, title) {
+      if (!api.setCompactMode) return false;
+      if (!SF || !SF.hasSolution(text)) return false;
+      titleEl.textContent = title || 'Solution';
+      render(text);
+      if (active) return true;
+      reopenEditModal = editModalEl.classList.contains('open');
+      editModalEl.classList.remove('open');          // hide only; its state is kept
+      if (settingsPop) settingsPop.classList.add('hidden');
+      overlayCard.classList.add('hidden');
+      view.classList.remove('hidden');
+      active = true;
+      api.setCompactMode(true);
+      return true;
+    }
+
+    function restore() {
+      if (!active) return;
+      active = false;
+      view.classList.add('hidden');
+      api.setCompactMode && api.setCompactMode(false);
+      overlayCard.classList.remove('hidden');
+      if (reopenEditModal) editModalEl.classList.add('open');
+      reopenEditModal = false;
+    }
+
+    restoreBtn.addEventListener('click', restore);
+    window.closeSolutionPanel = restore;   // used by the capture handlers
+
+    // Real answer text only — placeholders ("The answer will appear here…") are
+    // rendered in a .muted span and must not be popped out as a "solution".
+    function realAnswer(el) {
+      return el && !el.querySelector('.muted') ? (el.textContent || '').trim() : '';
+    }
+
+    document.getElementById('btn-popout').addEventListener('click', () => {
+      if (!open(realAnswer(answerBody), 'Solution')) setStatus('No solution to pop out yet.', 'error');
+    });
+    document.getElementById('edit-popout').addEventListener('click', () => {
+      const txt = realAnswer(document.getElementById('edit-answer'));
+      if (!open(txt, 'Solution')) {
+        const st = document.getElementById('edit-status');
+        if (st) st.textContent = 'No solution to pop out yet.';
+      }
+    });
+  })();
+
+  // On-screen capture buttons: same paths as the ⌘⇧1 / ⌘⇧2 hotkeys. In Local OCR
+  // mode the extracted text lands in the box above; in OpenAI-vision mode the
+  // send popup opens. The overlay is content-protected, so it is not captured.
+  ['full', 'region'].forEach((kind) => {
+    const btn = document.getElementById('btn-capture-' + kind);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      if (!api.triggerCapture) { setStatus('Capture bridge unavailable.', 'error'); return; }
+      api.triggerCapture(kind);
+    });
+  });
+
   document.getElementById('btn-clear-input').addEventListener('click', () => {
     ocrInput.value = '';
     activeRecordId = null;
@@ -749,6 +985,7 @@
   // ── Capture lifecycle (from main via IPC) ───────────────
   if (api.onSolveStatus) api.onSolveStatus((p) => {
     if (p && p.status === 'ocr') {
+      if (window.closeSolutionPanel) window.closeSolutionPanel();   // back to the full overlay
       showView('answer');
       setStatus('Reading screen…', 'thinking');
       ocrInput.value = '';
@@ -805,7 +1042,7 @@
 
     const records = (data && data.records) || [];
     if (!records.length) {
-      galleryGrid.innerHTML = '<div class="muted">No captures yet. Press ⌘⇧1 / ⌘⇧2 to capture.</div>';
+      galleryGrid.innerHTML = '<div class="muted">No captures yet. Use the Capture buttons in the Answer tab (or ⌘⇧1 / ⌘⇧2).</div>';
       return;
     }
     const groups = {};
@@ -1121,6 +1358,53 @@
         setStatus('Ask request failed: ' + (err && err.message ? err.message : String(err)));
       } finally {
         btnGetAnswer.disabled = false;
+      }
+    });
+
+    // ── Send the image straight to OpenAI vision (coding / scenario) ──────
+    // Sends the canvas exactly as it looks now (original, cropped, or drawn on).
+    // Scaled so the longest side is <= 2000px (matches the backend's downscale
+    // cap) to keep the request small and avoid oversized-payload errors.
+    const btnVision = document.getElementById('edit-vision-send');
+    const VISION_MAX_SIDE = 2000;
+    function canvasToVisionDataUrl() {
+      const w = canvas.width, h = canvas.height;
+      const scale = Math.min(1, VISION_MAX_SIDE / Math.max(w, h));
+      if (scale >= 1) return canvas.toDataURL('image/png');
+      const off = document.createElement('canvas');
+      off.width = Math.max(1, Math.round(w * scale));
+      off.height = Math.max(1, Math.round(h * scale));
+      off.getContext('2d').drawImage(canvas, 0, 0, off.width, off.height);
+      return off.toDataURL('image/png');
+    }
+    btnVision.addEventListener('click', async () => {
+      if (!api.visionAsk) { setStatus('Vision bridge unavailable.'); return; }
+      if (!canvas.width || !canvas.height) { setStatus('No image to send.'); return; }
+      const modeEl = document.querySelector('input[name="edit-vision-mode"]:checked');
+      const mode = modeEl ? modeEl.value : 'coding';
+      setStatus('Sending image to OpenAI…');
+      answerEl.innerHTML = '<span class="muted">Analyzing the image…</span>';
+      btnVision.disabled = true;
+      try {
+        const dataUrl = canvasToVisionDataUrl();
+        const data = await api.visionAsk([dataUrl], mode, toneSelect.value, undefined, ['screenshot-region']);
+        if (data && data.success) {
+          answerEl.textContent = data.answer || 'No answer returned.';
+          setStatus('Solution ready — saved as a new Gallery entry.');
+          loadGallery();
+        } else if (data && data.answer) {
+          // The model answered but saving the record failed: still show the answer.
+          answerEl.textContent = data.answer;
+          setStatus('Solution ready, but it could not be saved: ' + (data.error || 'unknown error'));
+        } else {
+          answerEl.innerHTML = '';
+          setStatus('Vision request failed: ' + ((data && data.error) || 'unknown error'));
+        }
+      } catch (err) {
+        answerEl.innerHTML = '';
+        setStatus('Vision request failed: ' + (err && err.message ? err.message : String(err)));
+      } finally {
+        btnVision.disabled = false;
       }
     });
 
@@ -1919,6 +2203,151 @@
     }
   }
   checkBackend();
+
+  // ── Direct-to-OpenAI vision capture (settings + send popup) ───────────
+  (function initVisionCapture() {
+    const VB = window.VisionBatch;
+    if (!VB) { console.warn('[vision] vision-batch.js not loaded'); return; }
+    const $ = (id) => document.getElementById(id);
+    const popup = $('vision-popup'), strip = $('vp-strip'), countEl = $('vp-count'), msgEl = $('vp-msg');
+    const addBtn = $('vp-add'), sendBtn = $('vp-send'), cancelBtn = $('vp-cancel');
+    const settingsBtn = $('btn-settings'), settingsPop = $('settings-pop');
+    const cmRadios = document.querySelectorAll('input[name="capture-mode"]');
+    const vmRadios = document.querySelectorAll('input[name="vision-mode"]');
+
+    // Capture mode (persisted; mirrored to main like the tone setting).
+    let stored = null;
+    try { stored = localStorage.getItem('captureMode'); } catch (_) {}
+    let captureMode = VB.normalizeCaptureMode(stored);
+    cmRadios.forEach((r) => { r.checked = (r.value === captureMode); });
+    cmRadios.forEach((r) => r.addEventListener('change', () => {
+      if (!r.checked) return;
+      captureMode = VB.normalizeCaptureMode(r.value);
+      try { localStorage.setItem('captureMode', captureMode); } catch (_) {}
+      api.setCaptureMode && api.setCaptureMode(captureMode);
+    }));
+    api.setCaptureMode && api.setCaptureMode(captureMode);
+
+    // Settings popover.
+    function setSettingsOpen(open) {
+      settingsPop.classList.toggle('hidden', !open);
+      settingsBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    settingsBtn.addEventListener('click', () => setSettingsOpen(settingsPop.classList.contains('hidden')));
+    document.addEventListener('mousedown', (e) => {
+      if (settingsPop.classList.contains('hidden')) return;
+      if (settingsPop.contains(e.target) || settingsBtn.contains(e.target)) return;
+      setSettingsOpen(false);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !settingsPop.classList.contains('hidden')) setSettingsOpen(false);
+    });
+
+    let batch = VB.createBatch();
+    let sending = false;
+    const isOpen = () => !popup.classList.contains('hidden');
+    function selectedMode() {
+      let v = 'coding';
+      vmRadios.forEach((r) => { if (r.checked) v = r.value; });
+      return VB.normalizeMode(v);
+    }
+    function openPopup() { popup.classList.remove('hidden'); renderPopup(); sendBtn.focus(); }
+    function closePopup() { popup.classList.add('hidden'); msgEl.textContent = ''; }
+
+    function renderPopup() {
+      countEl.textContent = VB.batchLabel(batch.length);
+      strip.textContent = '';
+      batch.forEach((item, i) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'vp-thumb';
+        const img = document.createElement('img');
+        img.src = item.dataUrl;
+        img.alt = 'Screenshot ' + (i + 1);
+        const rm = document.createElement('button');
+        rm.className = 'vp-rm';
+        rm.type = 'button';
+        rm.textContent = '✕';
+        rm.setAttribute('aria-label', 'Remove image ' + (i + 1));
+        rm.disabled = sending;
+        rm.addEventListener('click', () => {
+          if (sending) return;
+          batch = VB.removeImage(batch, item.id);
+          if (batch.length === 0) { closePopup(); } else { msgEl.textContent = ''; renderPopup(); }
+        });
+        wrap.appendChild(img); wrap.appendChild(rm); strip.appendChild(wrap);
+      });
+      sendBtn.disabled = batch.length === 0 || sending;
+      sendBtn.textContent = sending ? 'Sending…' : 'Send';
+      const full = VB.isFull(batch);
+      addBtn.disabled = full || sending;
+      addBtn.title = full ? 'Batch limit reached (' + VB.MAX_BATCH + ' images)' : '';
+      cancelBtn.disabled = sending;
+    }
+
+    api.onVisionCapture && api.onVisionCapture((payload) => {
+      if (!payload || typeof payload.dataUrl !== 'string') return;
+      // Window may be shrunk to the small solution panel: bring the full overlay back first.
+      if (window.closeSolutionPanel) window.closeSolutionPanel();
+      // Window may be shrunk to the dot: expand it first.
+      if (!floatingDot.classList.contains('hidden')) expandOverlay();
+      const res = VB.addImage(batch, { dataUrl: payload.dataUrl, sourceType: payload.sourceType });
+      batch = res.batch;
+      msgEl.textContent = res.capped
+        ? 'Batch limit reached (' + VB.MAX_BATCH + ' images). Send or remove one.' : '';
+      if (batch.length === 0) return;
+      openPopup();
+    });
+
+    addBtn.addEventListener('click', () => {
+      if (sending || VB.isFull(batch)) return;
+      closePopup();
+      setStatus('Vision batch: ' + VB.batchLabel(batch.length) + ' staged — capture another', 'idle');
+    });
+
+    function cancelBatch() {
+      if (sending) return;
+      batch = VB.clearBatch();
+      closePopup();
+    }
+    cancelBtn.addEventListener('click', cancelBatch);
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !isOpen()) return;
+      e.stopPropagation();
+      cancelBatch();
+    }, true);
+
+    sendBtn.addEventListener('click', async () => {
+      if (sending || batch.length === 0) return;
+      const req = VB.buildVisionRequest(batch, selectedMode());
+      sending = true;
+      msgEl.textContent = 'Sending ' + VB.batchLabel(batch.length) + ' to OpenAI…';
+      renderPopup();
+      try {
+        const data = await api.visionAsk(req.images, req.mode, toneSelect.value, undefined, req.source_types);
+        if (data && data.success) {
+          batch = VB.clearBatch();
+          closePopup();
+          showView('answer');
+          setStatus('Answer', 'ok');
+          answerBody.textContent = data.answer || 'No answer returned.';
+          activeRecordId = data.record_id || null;
+          renderHistory([]);
+          ocrInput.value = '';
+          loadGallery();
+        } else {
+          msgEl.textContent = 'Failed: ' + ((data && data.error) || 'unknown error');
+          setStatus('Error', 'error');
+        }
+      } catch (err) {
+        msgEl.textContent = 'Failed: ' + ((err && err.message) || err)
+          + ' (backendUrl=' + (api.backendUrl || 'undefined') + ')';
+        setStatus('Error', 'error');
+      } finally {
+        sending = false;
+        if (isOpen()) renderPopup();
+      }
+    });
+  })();
 </script>
 </body>
 </html>

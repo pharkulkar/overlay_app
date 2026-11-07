@@ -40,6 +40,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Overlay UI -> main: set the active answer tone (applied to hotkey captures)
   setTone: (tone) => ipcRenderer.send('set-tone', tone),
+  setCaptureMode: (mode) => ipcRenderer.send('set-capture-mode', mode),
+  // On-screen alternative to the capture hotkeys: kind = 'full' | 'region'.
+  triggerCapture: (kind) => ipcRenderer.send('trigger-capture', kind),
+  // Shrink the window into the small solution panel (true) or restore it (false).
+  setCompactMode: (on) => ipcRenderer.send('set-compact-mode', !!on),
 
   // Main process -> overlay renderer (capture/solve lifecycle)
   onSolveStatus: (cb) => ipcRenderer.on('solve-status', (_e, payload) => cb(payload)),
@@ -50,6 +55,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onAskNow: (cb) => ipcRenderer.on('ask-now', (_e, payload) => cb(payload)),
 
   // Main process -> overlay: OCR text ready (editable before asking)
+  onVisionCapture: (cb) => ipcRenderer.on('vision-capture', (_e, payload) => cb(payload)),
   onOcrReady: (cb) => ipcRenderer.on('ocr-ready', (_e, payload) => cb(payload)),
 
   // Main process -> overlay: the app is about to quit. Lets the renderer stop
@@ -73,6 +79,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return res.json();
   },
 
+  // Send one or more screenshots straight to OpenAI vision (no local OCR).
+  visionAsk: async (images, mode, tone, language, sourceTypes) => {
+    const body = { images, mode };
+    if (tone) body.tone = tone;
+    if (language) body.language = language;
+    if (Array.isArray(sourceTypes)) body.source_types = sourceTypes;
+    const res = await fetch(`${BACKEND_URL}/api/vision-ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    try {
+      return await res.json();
+    } catch (_e) {
+      return { success: false, error: `HTTP ${res.status}` };
+    }
+  },
   // Parse an uploaded resume (PDF/DOCX/TXT) into a candidate-profile string.
   // Stateless on the backend: the parsed profile is held only in the renderer
   // and sent on the /ws/interview start frame. `distill` (default true) asks

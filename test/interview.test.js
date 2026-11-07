@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
+const VisionBatch = require('../vision-batch.js');
 
 function loadInterviewModule() {
   const code = fs.readFileSync(path.join(__dirname, '..', 'interview.js'), 'utf8');
@@ -249,6 +250,93 @@ test('_sendStartFrame emits a start frame with the selected language set', () =>
   assert.strictEqual(frame.candidate_profile, 'profile text');
 });
 
+
+// ── Vision batch helper ──
+const mkItem = (n, t) => ({ dataUrl: 'data:image/png;base64,' + n, sourceType: t });
+test('vision: add appends with unique ids', () => {
+  let r = VisionBatch.addImage(VisionBatch.createBatch(), mkItem('a'));
+  r = VisionBatch.addImage(r.batch, mkItem('b'));
+  assert.strictEqual(r.batch.length, 2);
+  assert.notStrictEqual(r.batch[0].id, r.batch[1].id);
+  assert.strictEqual(r.added, true);
+});
+test('vision: add does not mutate input', () => {
+  const b = VisionBatch.createBatch();
+  VisionBatch.addImage(b, mkItem('a'));
+  assert.strictEqual(b.length, 0);
+});
+test('vision: cap at MAX_BATCH and custom max', () => {
+  let b = [];
+  for (let i = 0; i < VisionBatch.MAX_BATCH; i++) b = VisionBatch.addImage(b, mkItem('x' + i)).batch;
+  const r = VisionBatch.addImage(b, mkItem('over'));
+  assert.strictEqual(r.added, false);
+  assert.strictEqual(r.capped, true);
+  assert.strictEqual(r.batch.length, VisionBatch.MAX_BATCH);
+  const r2 = VisionBatch.addImage(VisionBatch.addImage([], mkItem('1'), 1).batch, mkItem('2'), 1);
+  assert.strictEqual(r2.capped, true);
+});
+test('vision: remove by id and unknown id no-op', () => {
+  let b = VisionBatch.addImage(VisionBatch.addImage([], mkItem('a')).batch, mkItem('b')).batch;
+  assert.strictEqual(VisionBatch.removeImage(b, b[0].id).length, 1);
+  assert.strictEqual(VisionBatch.removeImage(b, 'nope').length, 2);
+});
+test('vision: invalid items rejected', () => {
+  for (const bad of [null, {}, { dataUrl: '' }, { dataUrl: 5 }]) {
+    const r = VisionBatch.addImage([], bad);
+    assert.strictEqual(r.added, false);
+    assert.strictEqual(r.batch.length, 0);
+  }
+});
+test('vision: buildVisionRequest keeps order, mode and source types', () => {
+  let b = VisionBatch.addImage([], mkItem('a', 'screenshot-region')).batch;
+  b = VisionBatch.addImage(b, mkItem('b', 'screenshot-full')).batch;
+  const req = VisionBatch.buildVisionRequest(b, 'scenario');
+  assert.deepStrictEqual(req.images, [b[0].dataUrl, b[1].dataUrl]);
+  assert.deepStrictEqual(req.source_types, ['screenshot-region', 'screenshot-full']);
+  assert.strictEqual(req.mode, 'scenario');
+});
+test('vision: mode normalizers default safely', () => {
+  assert.strictEqual(VisionBatch.normalizeMode(undefined), 'coding');
+  assert.strictEqual(VisionBatch.normalizeMode('bogus'), 'coding');
+  assert.strictEqual(VisionBatch.normalizeMode('scenario'), 'scenario');
+  assert.strictEqual(VisionBatch.normalizeCaptureMode(undefined), 'ocr');
+  assert.strictEqual(VisionBatch.normalizeCaptureMode('bogus'), 'ocr');
+  assert.strictEqual(VisionBatch.normalizeCaptureMode('vision'), 'vision');
+});
+test('vision: batchLabel singular/plural', () => {
+  assert.strictEqual(VisionBatch.batchLabel(1), '1 image');
+  assert.strictEqual(VisionBatch.batchLabel(3), '3 images');
+});
+
+// ── Solution panel formatting (solution-format.js) ───────────────────────────
+const SolutionFormat = require('../solution-format.js');
+test('solution: splits prose and fenced code, dropping the ``` markers', () => {
+  const segs = SolutionFormat.splitSolution(
+    'Approach: use a hashmap.\n```python\ndef f(x):\n    return x\n```\nComplexity: O(n).');
+  assert.deepStrictEqual(segs.map((s) => s.type), ['text', 'code', 'text']);
+  assert.strictEqual(segs[0].content, 'Approach: use a hashmap.');
+  assert.strictEqual(segs[1].lang, 'python');
+  assert.strictEqual(segs[1].content, 'def f(x):\n    return x');   // indentation kept
+  assert.strictEqual(segs[2].content, 'Complexity: O(n).');
+});
+test('solution: an unclosed code fence is still shown as code', () => {
+  const segs = SolutionFormat.splitSolution('Here:\n```js\nconst a = 1;\nconst b = 2;');
+  assert.deepStrictEqual(segs.map((s) => s.type), ['text', 'code']);
+  assert.strictEqual(segs[1].content, 'const a = 1;\nconst b = 2;');
+});
+test('solution: plain text, multiple blocks, CRLF and empty input', () => {
+  assert.deepStrictEqual(SolutionFormat.splitSolution('just text'),
+    [{ type: 'text', content: 'just text' }]);
+  const two = SolutionFormat.splitSolution('```\na\n```\n```sql\nSELECT 1\n```');
+  assert.deepStrictEqual(two.map((s) => s.type), ['code', 'code']);
+  assert.strictEqual(two[0].lang, '');
+  assert.strictEqual(two[1].lang, 'sql');
+  assert.strictEqual(SolutionFormat.splitSolution('a\r\n```\r\nb\r\n```')[1].content, 'b');
+  assert.deepStrictEqual(SolutionFormat.splitSolution(''), []);
+  assert.deepStrictEqual(SolutionFormat.splitSolution(null), []);
+  assert.strictEqual(SolutionFormat.hasSolution('  '), false);
+  assert.strictEqual(SolutionFormat.hasSolution('x'), true);
+});
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) {
   for (const f of failures) console.log('FAILED: ' + f.name + '\n' + (f.e.stack || f.e.message) + '\n');
