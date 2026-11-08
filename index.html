@@ -12,8 +12,12 @@
     background: transparent !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     user-select: none; -webkit-user-select: none;
-    -webkit-app-region: drag; /* window draggable; interactive bits opt out */
+    /* NOTE: no native `-webkit-app-region: drag` here. Native drag only covers
+       what is not marked no-drag, which left just a few gaps draggable. Dragging
+       is handled in JS (initWindowDrag) so ANY non-interactive part of the
+       overlay can move the window. */
   }
+  img { -webkit-user-drag: none; }   /* don't start the browser's own image drag */
   .interactive { -webkit-app-region: no-drag; }
   /* Interactive content areas must opt out of window-drag so clicks/scroll work. */
   #gallery-grid, .g-item, .g-del, #answer-hero, #ocr-input, #history-list,
@@ -253,6 +257,16 @@
   .qa-genline .spin { width: 9px; height: 9px; border-radius: 50%;
     border: 2px solid rgba(76,154,255,0.3); border-top-color: #4c9aff; animation: ivspin 0.7s linear infinite; }
   @keyframes ivspin { to { transform: rotate(360deg); } }
+  /* Shared loader: spinner + label (+ optional Stop button). */
+  .loader { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #9aa3b2; }
+  .loader-spinner { width: 14px; height: 14px; border-radius: 50%; flex: none;
+    border: 2px solid rgba(76,154,255,0.25); border-top-color: #4c9aff;
+    animation: loader-spin 0.8s linear infinite; }
+  @keyframes loader-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .loader-spinner { animation: none; border-style: dashed; border-color: #4c9aff; }
+  }
+  .loader .act-btn { padding: 2px 8px; font-size: 11px; }
   .qa-a { font-size: 13px; line-height: 1.55; color: #f2f2f4; white-space: pre-wrap; word-break: break-word;
     margin-top: 4px; }
   .qa-a.collapsed { max-height: 72px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 60%, transparent); }
@@ -375,7 +389,7 @@
     backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     border: 1px solid rgba(255,255,255,0.16); border-radius: 14px;
   }
-  #compact-head { display: flex; align-items: center; gap: 8px; }   /* drag handle */
+  #compact-head { display: flex; align-items: center; gap: 8px; }   /* dragging works from anywhere (initWindowDrag) */
   #compact-title { flex: 1; font-size: 12px; font-weight: 600; color: #fff; }
   #compact-body {
     flex: 1; min-height: 0; overflow: auto; font-size: 13px; line-height: 1.5;
@@ -705,8 +719,89 @@
 <script src="interview.js"></script>
 <script src="vision-batch.js"></script>
 <script src="solution-format.js"></script>
+<script src="ux-helpers.js"></script>
 <script>
   const api = window.electronAPI || {};
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Drag the overlay from anywhere. A press on a non-interactive part of the UI
+  // becomes a window drag once the pointer moves a few pixels; buttons, inputs,
+  // dropdowns, the image canvas, scrollbars and text that opts into selection
+  // are left alone so they behave exactly as before. The main process moves the
+  // window using the live cursor position (see 'overlay-drag-*' in main.js).
+  // ══════════════════════════════════════════════════════════════════════
+  (function initWindowDrag() {
+    if (!api.dragStart || !api.dragMove || !api.dragEnd) return;   // bridge missing
+
+    const DRAG_THRESHOLD_PX = 4;   // below this a press is a click, not a drag
+    // Controls that must keep their own mouse behavior.
+    const INTERACTIVE = 'button, input, textarea, select, option, a, label, summary, canvas, '
+      + '[contenteditable="true"], .iv-langs-list, .no-window-drag';
+
+    let pending = null;       // { x, y } screen position of the press, before it becomes a drag
+    let dragging = false;
+    let swallowClick = false; // a drag must not also fire the click on whatever was under it
+    let frame = 0;
+
+    // Text that opts into selection (user-select: text) must stay selectable.
+    // Walk up: 'text'/'all' => selectable; 'none' => not; 'auto' => ask the parent.
+    function isSelectableText(el) {
+      for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+        const us = getComputedStyle(n).userSelect;
+        if (us === 'text' || us === 'all') return true;
+        if (us === 'none') return false;
+      }
+      return false;
+    }
+    // A press on a scrollbar scrolls; it must not drag the window.
+    function onScrollbar(e) {
+      const t = e.target;
+      return !!t && t.nodeType === 1 && (
+        (t.scrollHeight > t.clientHeight && e.offsetX >= t.clientWidth) ||
+        (t.scrollWidth > t.clientWidth && e.offsetY >= t.clientHeight));
+    }
+
+    function endDrag() {
+      const wasDragging = dragging;
+      pending = null;
+      dragging = false;
+      if (frame) { cancelAnimationFrame(frame); frame = 0; }
+      if (wasDragging) {
+        api.dragEnd();
+        swallowClick = true;
+        setTimeout(() => { swallowClick = false; }, 0);   // only the click right after this drag
+      }
+    }
+
+    document.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      const t = e.target;
+      if (!t || t.nodeType !== 1) return;
+      if (t.closest(INTERACTIVE) || onScrollbar(e) || isSelectableText(t)) return;
+      pending = { x: e.screenX, y: e.screenY };
+    }, true);
+
+    window.addEventListener('mousemove', (e) => {
+      if (!pending && !dragging) return;
+      if (e.buttons === 0) { endDrag(); return; }   // mouseup was missed (released elsewhere)
+      if (!dragging) {
+        const moved = Math.abs(e.screenX - pending.x) + Math.abs(e.screenY - pending.y);
+        if (moved < DRAG_THRESHOLD_PX) return;
+        dragging = true;
+        pending = null;
+        api.dragStart();
+      }
+      // One move message per animation frame; main reads the live cursor itself.
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (dragging) api.dragMove(); });
+    }, true);
+
+    window.addEventListener('mouseup', endDrag, true);
+    window.addEventListener('blur', endDrag);
+    // Swallow the click that would otherwise fire right after a drag.
+    document.addEventListener('click', (e) => {
+      if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); }
+    }, true);
+  })();
 
   // ── Elements ────────────────────────────────────────────
   const overlayCard = document.getElementById('overlay-card');
@@ -777,13 +872,56 @@
     statusDot.className = 'status-dot ' + (state || 'idle');
   }
 
+  // ── Shared loader (spinner + label + optional Stop) ─────
+  // Text goes in via textContent only. onStop (optional) adds a Stop button.
+  function createLoader(label, onStop) {
+    const wrap = document.createElement('div');
+    wrap.className = 'loader';
+    const spin = document.createElement('span');
+    spin.className = 'loader-spinner';
+    spin.setAttribute('aria-hidden', 'true');
+    const txt = document.createElement('span');
+    txt.className = 'loader-text';
+    txt.setAttribute('role', 'status');
+    txt.setAttribute('aria-live', 'polite');
+    txt.textContent = label || 'Loading…';
+    wrap.appendChild(spin);
+    wrap.appendChild(txt);
+    if (typeof onStop === 'function') {
+      const stop = document.createElement('button');
+      stop.type = 'button';
+      stop.className = 'act-btn';
+      stop.textContent = 'Stop';
+      stop.title = 'Stop waiting for this request';
+      stop.setAttribute('aria-label', 'Stop');
+      stop.addEventListener('click', (e) => { e.stopPropagation(); stop.disabled = true; onStop(); });
+      wrap.appendChild(stop);
+    }
+    return wrap;
+  }
+  function showLoader(container, label, onStop) {
+    container.textContent = '';
+    const node = createLoader(label, onStop);
+    container.appendChild(node);
+    return node;
+  }
+  function genRequestId(prefix) {
+    if (window.UxHelpers) return window.UxHelpers.newRequestId(prefix);
+    return (prefix || 'req') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+  function isCancelledResult(d) { return !!(d && d.cancelled === true); }
+  function stopRequest(rid) { if (api.cancelRequest) api.cancelRequest(rid); }
+
   // ── View switching ──────────────────────────────────────
+  let currentView = 'answer';
   function showView(which) {
+    currentView = which;
     Object.keys(views).forEach((k) => {
       views[k].classList.toggle('hidden', k !== which);
       navs[k].classList.toggle('active', k === which);
     });
-    if (which === 'gallery') loadGallery();
+    if (which === 'gallery') { loadGallery(); startGalleryPoll(); }
+    else stopGalleryPoll();
   }
   navs.answer.addEventListener('click', () => showView('answer'));
   navs.interview.addEventListener('click', () => showView('interview'));
@@ -811,11 +949,17 @@
   api.setTone && api.setTone(toneSelect.value);
 
   // ── Ask flow (edit OCR text -> OpenAI answer) ───────────
+  let askBusy = false;
   async function askCurrentText() {
+    if (askBusy) return;
     const text = (ocrInput.value || '').trim();
     if (!text) { setStatus('Type or capture some text first', 'error'); return; }
+    askBusy = true;
+    const askBtns = ['btn-ask', 'btn-regenerate'].map((id) => document.getElementById(id));
+    askBtns.forEach((b) => { if (b) b.disabled = true; });
+    const rid = genRequestId('ask');
     setStatus('Thinking…', 'thinking');
-    answerBody.innerHTML = '<span class="muted">Asking the assistant…</span>';
+    showLoader(answerBody, 'Asking the assistant…', () => stopRequest(rid));
     try {
       if (!api.askText) {
         // The preload bridge did not load askText — this is NOT a backend
@@ -826,15 +970,19 @@
         console.error('[ask] api.askText is undefined; electronAPI keys =', Object.keys(api));
         return;
       }
-      const data = await api.askText(text, toneSelect.value, activeRecordId);
-      if (data && data.success) {
+      const data = await api.askText(text, toneSelect.value, activeRecordId, undefined, rid);
+      if (isCancelledResult(data)) {
+        // User pressed Stop: keep the typed text, no error.
+        setStatus('Cancelled.', 'idle');
+        answerBody.innerHTML = '<span class="muted">Cancelled. Press ➤ Ask to try again.</span>';
+      } else if (data && data.success) {
         setStatus('Answer', 'ok');
         answerBody.textContent = data.answer || 'No answer returned.';
         if (data.record_id) activeRecordId = data.record_id;
         if (activeRecordId && api.getRecord) {
           try { const rr = await api.getRecord(activeRecordId); renderHistory(rr && rr.history); } catch (_) {}
         }
-        loadGallery();
+        loadGallery({ silent: true });
       } else {
         // Surface the REAL error from the backend instead of a generic string.
         setStatus('Error', 'error');
@@ -847,6 +995,9 @@
       answerBody.textContent = 'Ask request threw: ' + (err && err.message ? err.message : String(err))
         + '  (backendUrl=' + (api.backendUrl || 'undefined') + ')';
       console.error('[ask] fetch threw:', err);
+    } finally {
+      askBusy = false;
+      askBtns.forEach((b) => { if (b) b.disabled = false; });
     }
   }
 
@@ -989,7 +1140,12 @@
       showView('answer');
       setStatus('Reading screen…', 'thinking');
       ocrInput.value = '';
-      answerBody.innerHTML = '<span class="muted">Extracting text from the capture…</span>';
+      showLoader(answerBody, 'Reading screen…', () => { if (api.cancelOcr) api.cancelOcr(); });
+    } else if (p && p.status === 'cancelled') {
+      // Stop pressed: the capture stays saved in the Gallery. Not an error.
+      setStatus('Cancelled.', 'idle');
+      answerBody.innerHTML = '<span class="muted">Cancelled. The capture is saved in the Gallery.</span>';
+      loadGallery({ silent: true });
     }
   });
   // OCR finished: fill the editable box; user reviews/edits, then Ask.
@@ -1000,6 +1156,8 @@
     setStatus(ocrInput.value ? 'Edit the text, then press Ask' : 'No text detected — type your question', ocrInput.value ? 'idle' : 'error');
     answerBody.innerHTML = '<span class="muted">Review the extracted text above, then press ➤ Ask.</span>';
     ocrInput.focus();
+    // The backend saved this capture before OCR; show it in the Gallery too.
+    loadGallery({ silent: true });
   });
   if (api.onSolveError) api.onSolveError((p) => {
     setStatus('Error', 'error');
@@ -1008,7 +1166,7 @@
 
   // ── Gallery ─────────────────────────────────────────────
   const galleryGrid = document.getElementById('gallery-grid');
-  document.getElementById('gallery-refresh').addEventListener('click', loadGallery);
+  document.getElementById('gallery-refresh').addEventListener('click', () => loadGallery());
   document.getElementById('gallery-clear').addEventListener('click', async () => {
     if (!api.clearRecords) return;
     if (!confirm('Clear all history? (Records removed; images on disk kept.)')) return;
@@ -1020,8 +1178,17 @@
     try { return new Date(ts * 1000).toISOString().slice(0, 10); } catch (_) { return 'unknown'; }
   }
 
-  async function loadGallery() {
+  // Gallery refresh state. `silent` loads (auto-refresh) show no loader, keep
+  // the scroll position, skip re-rendering when nothing changed, and never
+  // write errors into the grid (console only).
+  let lastGallerySig = null;
+  let lastNewestSig = null;
+  let galleryFetchSeq = 0;
+  let galleryNeedsFullRender = true;   // grid shows a loader/error, not records
+  async function loadGallery(opts) {
+    const silent = !!(opts && typeof opts === 'object' && !(opts instanceof Event) && opts.silent);
     if (!api.listRecords) {
+      if (silent) return;
       // The preload bridge is missing listRecords — electronAPI didn't load.
       // This is distinct from the backend being unreachable.
       galleryGrid.innerHTML = '<span class="muted">electronAPI bridge not loaded '
@@ -1029,10 +1196,12 @@
       console.error('[gallery] api.listRecords undefined; electronAPI keys =', Object.keys(api));
       return;
     }
-    galleryGrid.innerHTML = '<div class="muted">Loading…</div>';
+    const seq = ++galleryFetchSeq;
+    if (!silent) { showLoader(galleryGrid, 'Loading…'); galleryNeedsFullRender = true; lastGallerySig = null; }
     let data;
     try { data = await api.listRecords(); }
     catch (err) {
+      if (silent) { console.warn('[gallery] silent refresh failed:', err); return; }
       galleryGrid.innerHTML = '<span class="muted">Could not reach backend: '
         + (err && err.message ? err.message : String(err))
         + ' (backendUrl=' + (api.backendUrl || 'undefined') + ')</span>';
@@ -1040,7 +1209,18 @@
       return;
     }
 
+    if (seq !== galleryFetchSeq) return;   // a newer load superseded this one
+    if (silent && !(data && Array.isArray(data.records))) {
+      console.warn('[gallery] silent refresh got an unexpected response:', data);
+      return;
+    }
     const records = (data && data.records) || [];
+    const sig = window.UxHelpers ? window.UxHelpers.recordsSignature(records) : null;
+    if (silent && !galleryNeedsFullRender && sig !== null && sig === lastGallerySig) return;   // nothing changed
+    lastGallerySig = sig;
+    galleryNeedsFullRender = false;
+    lastNewestSig = window.UxHelpers ? window.UxHelpers.newestSignature(records) : null;
+    const prevScroll = silent ? galleryGrid.scrollTop : 0;
     if (!records.length) {
       galleryGrid.innerHTML = '<div class="muted">No captures yet. Use the Capture buttons in the Answer tab (or ⌘⇧1 / ⌘⇧2).</div>';
       return;
@@ -1078,6 +1258,7 @@
       html += '</div>';
     }
     galleryGrid.innerHTML = html;
+    if (silent) galleryGrid.scrollTop = prevScroll;
 
     galleryGrid.querySelectorAll('.g-item').forEach((el) => {
       el.addEventListener('click', (e) => {
@@ -1103,6 +1284,49 @@
       });
     });
   }
+
+  // Gallery auto-refresh poll. Only runs while the Gallery tab is the visible
+  // view AND the page is visible, with at most one poll in flight. Each tick
+  // asks for just the newest record (GET /api/records?limit=1, a few hundred
+  // bytes) and does the full silent reload only when it changed. Trade-off: a
+  // change to an OLDER record made outside the overlay (e.g. deletion) shows up
+  // on focus, tab open or manual Refresh rather than on the next tick.
+  let pollTimer = null;
+  let pollInFlight = false;
+  async function pollGallery() {
+    if (!window.UxHelpers || !window.UxHelpers.shouldPoll({
+      view: currentView, visible: document.visibilityState,
+      inFlight: pollInFlight, hasBridge: !!api.listRecords,
+    })) return;
+    pollInFlight = true;
+    try {
+      const data = await api.listRecords(1, 0);
+      if (!data || !Array.isArray(data.records)) return;
+      const sig = window.UxHelpers.newestSignature(data.records);
+      if (sig !== lastNewestSig) {
+        // lastNewestSig is updated by loadGallery only after a successful
+        // render, so a failed reload is retried on the next tick.
+        await loadGallery({ silent: true });
+      }
+    } catch (err) {
+      console.warn('[gallery] poll failed:', err);
+    } finally {
+      pollInFlight = false;
+    }
+  }
+  function startGalleryPoll() {
+    if (pollTimer || !window.UxHelpers) return;
+    pollTimer = setInterval(pollGallery, window.UxHelpers.POLL_INTERVAL_MS);
+  }
+  function stopGalleryPoll() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+  window.addEventListener('focus', () => {
+    if (currentView === 'gallery') loadGallery({ silent: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && currentView === 'gallery') loadGallery({ silent: true });
+  });
 
   async function openRecord(id) {
     console.log('[openRecord] clicked id=', id, 'backend=', api.backendUrl);
@@ -1191,7 +1415,19 @@
     let sourceExtractedText = '';      // original text (for version labelling)
 
     function setStatus(msg) { statusEl.textContent = msg || ''; }
-
+    // Loader (+ Stop) in the status line; the next setStatus() replaces it.
+    function showBusy(label, onStop) {
+      statusEl.textContent = '';
+      statusEl.appendChild(createLoader(label, onStop));
+    }
+    // Only one long operation at a time: toggle all three action buttons.
+    function setBusy(on) {
+      [btnOcr, btnGetAnswer, btnVision].forEach((b) => { if (b) b.disabled = !!on; });
+    }
+    function restoreNodes(el, nodes) {
+      el.textContent = '';
+      nodes.forEach((n) => el.appendChild(n));
+    }
     function isImageType(st) {
       return st === 'screenshot-full' || st === 'screenshot-region' ||
         (st && st.indexOf('screenshot') === 0);
@@ -1309,12 +1545,16 @@
     btnOcr.addEventListener('click', async () => {
       if (!api.ocrImage) { setStatus('OCR bridge unavailable.'); return; }
       if (!canvas.width || !canvas.height) { setStatus('No image to OCR.'); return; }
-      setStatus('Running OCR…');
-      btnOcr.disabled = true;
+      const rid = genRequestId('ocr');
+      showBusy('Running OCR…', () => stopRequest(rid));
+      setBusy(true);
       try {
         const dataUrl = canvas.toDataURL('image/png');
-        const data = await api.ocrImage(dataUrl, 'screenshot-region');
-        if (data && data.success) {
+        const data = await api.ocrImage(dataUrl, 'screenshot-region', rid);
+        if (isCancelledResult(data)) {
+          // Stop pressed: canvas, text and current record stay untouched.
+          setStatus('Cancelled.');
+        } else if (data && data.success) {
           // The new record IS the new version.
           editRecordId = data.record_id;
           editSourceType = 'screenshot-region';
@@ -1323,14 +1563,14 @@
           if (label) { verBadge.textContent = label; verBadge.classList.remove('hidden'); }
           setStatus('OCR complete — saved as a new version. Edit the text, then Get Answer.');
           // Refresh the grid in the background so the new entry appears.
-          loadGallery();
+          loadGallery({ silent: true });
         } else {
           setStatus('OCR failed: ' + ((data && data.error) || 'unknown error'));
         }
       } catch (err) {
         setStatus('OCR request failed: ' + (err && err.message ? err.message : String(err)));
       } finally {
-        btnOcr.disabled = false;
+        setBusy(false);
       }
     });
 
@@ -1339,16 +1579,21 @@
       const text = (textArea.value || '').trim();
       if (!text) { setStatus('Enter or OCR some text first.'); return; }
       if (!api.askText) { setStatus('Ask bridge unavailable.'); return; }
+      const rid = genRequestId('ask');
+      const prevAnswer = Array.from(answerEl.childNodes);
       setStatus('Asking the assistant…');
-      answerEl.innerHTML = '<span class="muted">Thinking…</span>';
-      btnGetAnswer.disabled = true;
+      showLoader(answerEl, 'Thinking…', () => stopRequest(rid));
+      setBusy(true);
       try {
-        const data = await api.askText(text, toneSelect.value, editRecordId);
-        if (data && data.success) {
+        const data = await api.askText(text, toneSelect.value, editRecordId, undefined, rid);
+        if (isCancelledResult(data)) {
+          restoreNodes(answerEl, prevAnswer);   // keep text + previous answer
+          setStatus('Cancelled.');
+        } else if (data && data.success) {
           answerEl.textContent = data.answer || 'No answer returned.';
           if (data.record_id) editRecordId = data.record_id;
           setStatus('Answer ready.');
-          loadGallery();
+          loadGallery({ silent: true });
         } else {
           answerEl.innerHTML = '';
           setStatus('Ask failed: ' + ((data && data.error) || 'unknown error'));
@@ -1357,7 +1602,7 @@
         answerEl.innerHTML = '';
         setStatus('Ask request failed: ' + (err && err.message ? err.message : String(err)));
       } finally {
-        btnGetAnswer.disabled = false;
+        setBusy(false);
       }
     });
 
@@ -1382,16 +1627,21 @@
       if (!canvas.width || !canvas.height) { setStatus('No image to send.'); return; }
       const modeEl = document.querySelector('input[name="edit-vision-mode"]:checked');
       const mode = modeEl ? modeEl.value : 'coding';
+      const rid = genRequestId('vis');
+      const prevAnswer = Array.from(answerEl.childNodes);
       setStatus('Sending image to OpenAI…');
-      answerEl.innerHTML = '<span class="muted">Analyzing the image…</span>';
-      btnVision.disabled = true;
+      showLoader(answerEl, 'Analyzing the image…', () => stopRequest(rid));
+      setBusy(true);
       try {
         const dataUrl = canvasToVisionDataUrl();
-        const data = await api.visionAsk([dataUrl], mode, toneSelect.value, undefined, ['screenshot-region']);
-        if (data && data.success) {
+        const data = await api.visionAsk([dataUrl], mode, toneSelect.value, undefined, ['screenshot-region'], rid);
+        if (isCancelledResult(data)) {
+          restoreNodes(answerEl, prevAnswer);   // canvas is untouched
+          setStatus('Cancelled.');
+        } else if (data && data.success) {
           answerEl.textContent = data.answer || 'No answer returned.';
           setStatus('Solution ready — saved as a new Gallery entry.');
-          loadGallery();
+          loadGallery({ silent: true });
         } else if (data && data.answer) {
           // The model answered but saving the record failed: still show the answer.
           answerEl.textContent = data.answer;
@@ -1404,7 +1654,7 @@
         answerEl.innerHTML = '';
         setStatus('Vision request failed: ' + (err && err.message ? err.message : String(err)));
       } finally {
-        btnVision.disabled = false;
+        setBusy(false);
       }
     });
 
@@ -2320,11 +2570,15 @@
       if (sending || batch.length === 0) return;
       const req = VB.buildVisionRequest(batch, selectedMode());
       sending = true;
-      msgEl.textContent = 'Sending ' + VB.batchLabel(batch.length) + ' to OpenAI…';
+      const rid = genRequestId('vis');
+      showLoader(msgEl, 'Sending ' + VB.batchLabel(batch.length) + ' to OpenAI…', () => stopRequest(rid));
       renderPopup();
       try {
-        const data = await api.visionAsk(req.images, req.mode, toneSelect.value, undefined, req.source_types);
-        if (data && data.success) {
+        const data = await api.visionAsk(req.images, req.mode, toneSelect.value, undefined, req.source_types, rid);
+        if (window.UxHelpers && window.UxHelpers.isCancelled(data)) {
+          // User pressed Stop: keep the staged batch and leave the popup open.
+          msgEl.textContent = 'Cancelled.';
+        } else if (data && data.success) {
           batch = VB.clearBatch();
           closePopup();
           showView('answer');
@@ -2333,7 +2587,7 @@
           activeRecordId = data.record_id || null;
           renderHistory([]);
           ocrInput.value = '';
-          loadGallery();
+          loadGallery({ silent: true });
         } else {
           msgEl.textContent = 'Failed: ' + ((data && data.error) || 'unknown error');
           setStatus('Error', 'error');

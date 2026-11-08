@@ -52,6 +52,15 @@ function saveWindowState() {
   } catch (_) {}
 }
 
+let saveWindowStateTimer = null;
+function scheduleSaveWindowState() {
+  if (saveWindowStateTimer) clearTimeout(saveWindowStateTimer);
+  saveWindowStateTimer = setTimeout(() => {
+    saveWindowStateTimer = null;
+    saveWindowState();
+  }, 300);
+}
+
 function createOverlayWindow() {
   const saved = loadWindowState();
   overlayWindow = new BrowserWindow({
@@ -82,8 +91,11 @@ function createOverlayWindow() {
   overlayWindow.loadFile('index.html');
 
   // Persist position/size when the user moves or resizes the overlay.
-  overlayWindow.on('moved', saveWindowState);
-  overlayWindow.on('resized', saveWindowState);
+  // Debounced: on macOS 'moved' is an alias of 'move' and fires continuously
+  // while the window is being dragged. A synchronous file write on every one of
+  // those events makes dragging stutter, so coalesce them into one trailing save.
+  overlayWindow.on('moved', scheduleSaveWindowState);
+  overlayWindow.on('resized', scheduleSaveWindowState);
 }
 
 // ── Screen capture ─────────────────────────────────────────────────────────
@@ -236,15 +248,28 @@ function deliverVisionCapture(dataUrl, sourceType) {
   if (!overlayWindow.isVisible()) overlayWindow.show();
   sendToOverlay('vision-capture', { dataUrl, sourceType });
 }
+// Controller of the in-flight local-OCR request (null when idle). Cancelling
+// ('cancel-ocr' IPC) only stops WAITING: the backend has already saved the
+// capture/record before OCR runs, so it stays in the Gallery, and OCR itself
+// finishes in the background on the server (its result is ignored here).
+let ocrAbort = null;
 async function sendToSolve(dataUrl, sourceType) {
+  if (ocrAbort) {  // a newer capture supersedes the older wait, silently
+    ocrAbort.superseded = true;
+    ocrAbort.abort();
+  }
+  const ac = new AbortController();
+  ocrAbort = ac;
   sendToOverlay('solve-status', { status: 'ocr' });
   try {
     const res = await fetch(`${BACKEND_URL}/api/ocr-only`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: dataUrl, source_type: sourceType }),
+      signal: ac.signal,
     });
     const data = await res.json();
+    if (ac.signal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
     if (data.success) {
       sendToOverlay('ocr-ready', {
         text: data.extracted_text || '',
@@ -254,10 +279,19 @@ async function sendToSolve(dataUrl, sourceType) {
       sendToOverlay('solve-error', { error: data.error || 'OCR failed.' });
     }
   } catch (err) {
+    if (err && err.name === 'AbortError' || ac.signal.aborted) {
+      if (!ac.superseded) sendToOverlay('solve-status', { status: 'cancelled' });
+      return;
+    }
     sendToOverlay('solve-error', { error: `Backend unreachable: ${err.message || err}` });
+  } finally {
+    if (ocrAbort === ac) ocrAbort = null;
   }
 }
-
+ipcMain.on('cancel-ocr', (event) => {
+  if (!isOverlaySender(event)) return;
+  if (ocrAbort) ocrAbort.abort();
+});
 function sendToOverlay(channel, payload) {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send(channel, payload);
@@ -318,6 +352,42 @@ ipcMain.on('get-vad-config', (event) => {
     maxUtterMs: pick('VAD_MAX_UTTER_MS', 'maxUtterMs'),
     speechLevel: pick('VAD_SPEECH_LEVEL', 'speechLevel'),
   };
+});
+
+// ── Drag the window from anywhere ────────────────────────────────────────────
+// Electron's native -webkit-app-region drag only covers whatever is NOT marked
+// no-drag, which left only scattered gaps draggable. The renderer now decides
+// when a press on non-interactive UI becomes a drag and tells us with three
+// messages. On every move we read the LIVE cursor position here (same DIP
+// coordinate space as window bounds, correct across displays) and place the
+// window at start-position + cursor-delta, keeping its size fixed.
+let dragState = null;
+
+function isOverlaySender(event) {
+  return overlayWindow && !overlayWindow.isDestroyed()
+    && BrowserWindow.fromWebContents(event.sender) === overlayWindow;
+}
+
+ipcMain.on('overlay-drag-start', (event) => {
+  if (!isOverlaySender(event)) return;
+  dragState = { cursor: screen.getCursorScreenPoint(), bounds: overlayWindow.getBounds() };
+});
+
+ipcMain.on('overlay-drag-move', (event) => {
+  if (!dragState || !isOverlaySender(event)) return;
+  const cur = screen.getCursorScreenPoint();
+  overlayWindow.setBounds({
+    x: Math.round(dragState.bounds.x + cur.x - dragState.cursor.x),
+    y: Math.round(dragState.bounds.y + cur.y - dragState.cursor.y),
+    width: dragState.bounds.width,     // size stays fixed while dragging
+    height: dragState.bounds.height,
+  });
+});
+
+ipcMain.on('overlay-drag-end', (event) => {
+  if (!isOverlaySender(event)) return;
+  dragState = null;
+  saveWindowState();   // persist the final position right away (no-op when compact)
 });
 
 // ── Small solution panel ─────────────────────────────────────────────────────

@@ -18,6 +18,40 @@ try {
   VAD_CONFIG = ipcRenderer.sendSync('get-vad-config') || {};
 } catch (_) { VAD_CONFIG = {}; }
 
+// In-flight cancellable requests, keyed by a caller-supplied string requestId
+// (contextBridge cannot pass an AbortSignal, so the renderer uses ids).
+// LIMITS: aborting the fetch only stops WAITING; it cannot abort the upstream
+// OpenAI call (tokens may still be consumed), and OCR already running on the
+// server finishes in the background (the UI ignores its result).
+const inflight = new Map();
+const CANCELLED = () => ({ success: false, cancelled: true, error: 'Cancelled' });
+async function trackedFetch(url, options, requestId) {
+  if (!requestId) {
+    const res = await fetch(url, options);
+    return res.json();
+  }
+  const ac = new AbortController();
+  inflight.set(requestId, ac);
+  try {
+    const res = await fetch(url, Object.assign({}, options, { signal: ac.signal }));
+    try {
+      return await res.json();
+    } catch (e) {
+      if (ac.signal.aborted) return CANCELLED();
+      return { success: false, error: `HTTP ${res.status}` };
+    }
+  } catch (e) {
+    if (ac.signal.aborted || (e && e.name === 'AbortError')) return CANCELLED();
+    throw e;
+  } finally {
+    if (inflight.get(requestId) === ac) inflight.delete(requestId);
+  }
+}
+const jsonPost = (body) => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
 contextBridge.exposeInMainWorld('electronAPI', {
   // Backend config
   backendUrl: BACKEND_URL,
@@ -45,6 +79,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   triggerCapture: (kind) => ipcRenderer.send('trigger-capture', kind),
   // Shrink the window into the small solution panel (true) or restore it (false).
   setCompactMode: (on) => ipcRenderer.send('set-compact-mode', !!on),
+  // Drag the window from anywhere on non-interactive UI (see index.html). The
+  // main process reads the live cursor position itself, so no coordinates are sent.
+  dragStart: () => ipcRenderer.send('overlay-drag-start'),
+  dragMove: () => ipcRenderer.send('overlay-drag-move'),
+  dragEnd: () => ipcRenderer.send('overlay-drag-end'),
 
   // Main process -> overlay renderer (capture/solve lifecycle)
   onSolveStatus: (cb) => ipcRenderer.on('solve-status', (_e, payload) => cb(payload)),
@@ -68,33 +107,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Ask OpenAI with (possibly edited) text; optionally persist onto a record.
   // `language` (optional) pins the answer language; omitted when undefined so
   // the Answer tab's 3-arg calls stay byte-for-byte today's request.
-  askText: async (text, tone, recordId, language) => {
+  askText: async (text, tone, recordId, language, requestId) => {
     const body = { text, tone, record_id: recordId };
     if (language) body.language = language;
-    const res = await fetch(`${BACKEND_URL}/api/ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    return res.json();
+    if (requestId) body.request_id = requestId;
+    return trackedFetch(`${BACKEND_URL}/api/ask`, jsonPost(body), requestId);
   },
+  // Stop waiting for a tracked request: abort locally, then best-effort tell
+  // the backend (fire-and-forget) so it discards the result instead of saving.
+  cancelRequest: (requestId) => {
+    if (!requestId) return false;
+    const ac = inflight.get(requestId);
+    if (ac) { ac.abort(); inflight.delete(requestId); }
+    try {
+      fetch(`${BACKEND_URL}/api/cancel`, jsonPost({ request_id: requestId })).catch(() => {});
+    } catch (_e) { /* ignore */ }
+    return !!ac;
+  },
+  // Stop waiting for the main-process (hotkey/button) local OCR request.
+  cancelOcr: () => ipcRenderer.send('cancel-ocr'),
 
   // Send one or more screenshots straight to OpenAI vision (no local OCR).
-  visionAsk: async (images, mode, tone, language, sourceTypes) => {
+  visionAsk: async (images, mode, tone, language, sourceTypes, requestId) => {
     const body = { images, mode };
     if (tone) body.tone = tone;
     if (language) body.language = language;
     if (Array.isArray(sourceTypes)) body.source_types = sourceTypes;
-    const res = await fetch(`${BACKEND_URL}/api/vision-ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    try {
-      return await res.json();
-    } catch (_e) {
-      return { success: false, error: `HTTP ${res.status}` };
-    }
+    if (requestId) body.request_id = requestId;
+    return trackedFetch(`${BACKEND_URL}/api/vision-ask`, jsonPost(body), requestId);
   },
   // Parse an uploaded resume (PDF/DOCX/TXT) into a candidate-profile string.
   // Stateless on the backend: the parsed profile is held only in the renderer
@@ -109,8 +149,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // ── Backend REST helpers (gallery + caching, Phase 2b) ──────────────────
-  listRecords: async () => {
-    const res = await fetch(`${BACKEND_URL}/api/records`);
+  // Optional limit/offset (non-negative ints) for cheap polling, e.g. (1, 0).
+  listRecords: async (limit, offset) => {
+    let qs = '';
+    if (Number.isInteger(limit) && limit >= 0) {
+      qs = `?limit=${limit}`;
+      if (Number.isInteger(offset) && offset >= 0) qs += `&offset=${offset}`;
+    }
+    const res = await fetch(`${BACKEND_URL}/api/records${qs}`);
     return res.json();
   },
   getRecord: async (id) => {
@@ -120,21 +166,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // OCR an edited/cropped image. Creates a NEW record on the backend (the
   // "new version" Gallery entry) with the posted image saved to disk and
   // OCR'd. Returns { success, record_id, extracted_text }.
-  ocrImage: async (dataUrl, sourceType = 'screenshot-region') => {
-    const res = await fetch(`${BACKEND_URL}/api/ocr-only`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl, source_type: sourceType }),
-    });
-    return res.json();
+  // requestId (optional) is tracked locally only; the backend never sees it.
+  ocrImage: async (dataUrl, sourceType = 'screenshot-region', requestId) => {
+    return trackedFetch(`${BACKEND_URL}/api/ocr-only`,
+      jsonPost({ image: dataUrl, source_type: sourceType }), requestId);
   },
-  solveRecord: async (id, force = false, tone = null) => {
-    const res = await fetch(`${BACKEND_URL}/api/solve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ record_id: id, force, tone }),
-    });
-    return res.json();
+  // requestId (optional) is tracked locally only: cancelling stops waiting, but
+  // /api/solve never sees the id, so the backend may still persist the answer.
+  solveRecord: async (id, force = false, tone = null, requestId) => {
+    return trackedFetch(`${BACKEND_URL}/api/solve`,
+      jsonPost({ record_id: id, force, tone }), requestId);
   },
   deleteRecord: async (id) => {
     const res = await fetch(`${BACKEND_URL}/api/records/${id}`, { method: 'DELETE' });

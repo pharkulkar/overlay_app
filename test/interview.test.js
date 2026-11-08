@@ -12,6 +12,7 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 const VisionBatch = require('../vision-batch.js');
+const UxHelpers = require('../ux-helpers.js');
 
 function loadInterviewModule() {
   const code = fs.readFileSync(path.join(__dirname, '..', 'interview.js'), 'utf8');
@@ -336,6 +337,46 @@ test('solution: plain text, multiple blocks, CRLF and empty input', () => {
   assert.deepStrictEqual(SolutionFormat.splitSolution(null), []);
   assert.strictEqual(SolutionFormat.hasSolution('  '), false);
   assert.strictEqual(SolutionFormat.hasSolution('x'), true);
+});
+test('UxHelpers: gallery signature stable and sensitive to id/status/answer', () => {
+  const a = [{ id: 'r2', status: 'captured', answer: '' }, { id: 'r1', status: 'answered', answer: 'x' }];
+  const same = JSON.parse(JSON.stringify(a));
+  assert.strictEqual(UxHelpers.recordsSignature(a), UxHelpers.recordsSignature(same));
+  assert.notStrictEqual(UxHelpers.recordsSignature(a), UxHelpers.recordsSignature([{ id: 'r3', status: 'captured' }].concat(a)));
+  const st = JSON.parse(JSON.stringify(a)); st[0].status = 'error';
+  assert.notStrictEqual(UxHelpers.recordsSignature(a), UxHelpers.recordsSignature(st));
+  const an = JSON.parse(JSON.stringify(a)); an[0].answer = 'now';
+  assert.notStrictEqual(UxHelpers.recordsSignature(a), UxHelpers.recordsSignature(an));
+  assert.strictEqual(UxHelpers.recordsSignature([]), '');
+  assert.strictEqual(UxHelpers.newestSignature([]), '');
+  assert.strictEqual(UxHelpers.newestSignature(a), 'r2|captured|0');
+});
+test('UxHelpers: galleryChanged', () => {
+  assert.strictEqual(UxHelpers.galleryChanged('a', 'a'), false);
+  assert.strictEqual(UxHelpers.galleryChanged('a', 'b'), true);
+});
+test('UxHelpers: shouldPoll truth table', () => {
+  const ok = { view: 'gallery', visible: 'visible', inFlight: false, hasBridge: true };
+  assert.strictEqual(UxHelpers.shouldPoll(ok), true);
+  assert.strictEqual(UxHelpers.shouldPoll(Object.assign({}, ok, { view: 'answer' })), false);
+  assert.strictEqual(UxHelpers.shouldPoll(Object.assign({}, ok, { visible: 'hidden' })), false);
+  assert.strictEqual(UxHelpers.shouldPoll(Object.assign({}, ok, { inFlight: true })), false);
+  assert.strictEqual(UxHelpers.shouldPoll(Object.assign({}, ok, { hasBridge: false })), false);
+});
+test('UxHelpers: newRequestId unique and short', () => {
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) {
+    const id = UxHelpers.newRequestId('ask');
+    assert.strictEqual(typeof id, 'string');
+    assert.ok(id.length <= 128);
+    seen.add(id);
+  }
+  assert.strictEqual(seen.size, 200);
+});
+test('UxHelpers: isCancelled', () => {
+  assert.strictEqual(UxHelpers.isCancelled(null), false);
+  assert.strictEqual(UxHelpers.isCancelled({}), false);
+  assert.strictEqual(UxHelpers.isCancelled({ cancelled: true }), true);
 });
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) {
