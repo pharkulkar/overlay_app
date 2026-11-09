@@ -252,6 +252,49 @@ test('_sendStartFrame emits a start frame with the selected language set', () =>
 });
 
 
+// Roman (English-letters) option.
+test('start frame includes roman, default true', () => {
+  const IV = loadInterviewModule();
+  const captured = [];
+  IV._state.ivWs = { readyState: 1, send: (x) => captured.push(JSON.parse(x)) };
+  IV._sendStartFrame();
+  assert.strictEqual(captured[0].roman, true);
+});
+test('setRoman/getRoman round-trip and reflected in the start frame', () => {
+  const IV = loadInterviewModule();
+  assert.strictEqual(IV.getRoman(), true);
+  IV.setRoman(false);
+  assert.strictEqual(IV.getRoman(), false);
+  assert.strictEqual(IV._buildStartFrame().roman, false);
+  IV.setRoman(undefined);
+  assert.strictEqual(IV.getRoman(), true);
+});
+test('parseStoredRoman defaults ON', () => {
+  const IV = loadInterviewModule();
+  assert.strictEqual(IV.parseStoredRoman(null), true);
+  assert.strictEqual(IV.parseStoredRoman(undefined), true);
+  assert.strictEqual(IV.parseStoredRoman('true'), true);
+  assert.strictEqual(IV.parseStoredRoman('false'), false);
+  assert.strictEqual(IV.parseStoredRoman('0'), false);
+  assert.strictEqual(IV.parseStoredRoman('garbage'), true);
+});
+test('registry mirror has ur/kn/ml with unique codes', () => {
+  const IV = loadInterviewModule();
+  const codes = Array.from(IV.SUPPORTED_LANGUAGES).map((l) => l.code);
+  for (const c of ['ur', 'kn', 'ml']) assert.ok(codes.includes(c), c);
+  assert.strictEqual(new Set(codes).size, codes.length);
+  assert.strictEqual(codes[0], 'en');
+});
+test('audio envelope carries roman and index.html has one #iv-roman with data-tip', () => {
+  const fs = require('fs'), path = require('path');
+  const js = fs.readFileSync(path.join(__dirname, '..', 'interview.js'), 'utf8');
+  assert.ok(js.includes('languages: state.languages, roman: state.roman'));
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.strictEqual((html.match(/id="iv-roman"/g) || []).length, 1);
+  const tag = html.match(/<label class="iv-roman"[^>]*>/)[0];
+  assert.ok(tag.includes('data-tip='));
+  assert.ok(!/title=/.test(tag));
+});
 // ── Vision batch helper ──
 const mkItem = (n, t) => ({ dataUrl: 'data:image/png;base64,' + n, sourceType: t });
 test('vision: add appends with unique ids', () => {

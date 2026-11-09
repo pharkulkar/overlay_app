@@ -218,6 +218,8 @@
   }
   .iv-langs-list label:hover { background: rgba(255,255,255,0.06); border-radius: 4px; }
   .iv-langs-list input { margin: 0; }
+  .iv-roman { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #d6d9df; white-space: nowrap; user-select: none; }
+  .iv-roman input { margin: 0; }
   .qa-lang-badge {
     display: inline-block; margin-left: 6px; padding: 0 5px;
     font-size: 9px; line-height: 15px; border-radius: 4px;
@@ -573,6 +575,7 @@
         <summary class="act-btn" id="iv-lang-summary">Languages: EN</summary>
         <div class="iv-langs-list" id="iv-langs-list"></div>
       </details>
+      <label class="iv-roman" data-tip="Transcripts and answers use English letters for every language"><input type="checkbox" id="iv-roman" checked><span>Show everything in English letters</span></label>
       <!-- Resume (CV) document controls. The iv-cv-* prefix is deliberate:
            #iv-resume above is the "Resume listening" playback control. -->
       <input type="file" id="iv-cv-input" accept=".pdf,.docx,.txt" style="display:none;">
@@ -2551,6 +2554,7 @@
       error: document.getElementById('iv-error'),
       qa: document.getElementById('iv-qa'),
       langs: document.getElementById('iv-langs'),
+      roman: document.getElementById('iv-roman'),
       langSummary: document.getElementById('iv-lang-summary'),
       langList: document.getElementById('iv-langs-list'),
       cvInput: document.getElementById('iv-cv-input'),
@@ -2580,6 +2584,15 @@
     }
     function writeStoredLanguages(codes) {
       try { localStorage.setItem(LANG_STORAGE_KEY, JSON.stringify(codes)); } catch (_) {}
+    }
+    // "Show everything in English letters": default ON, persisted. Applies on
+    // the next Stop -> Start (same as the language set).
+    const ROMAN_STORAGE_KEY = 'iv.roman';
+    function readStoredRoman() {
+      try { return IV.parseStoredRoman(localStorage.getItem(ROMAN_STORAGE_KEY)); } catch (_) { return true; }
+    }
+    function writeStoredRoman(on) {
+      try { localStorage.setItem(ROMAN_STORAGE_KEY, on ? 'true' : 'false'); } catch (_) {}
     }
     function availableCodes() { return langRegistry.map((l) => l.code); }
     function getSelectedLanguages() {
@@ -2880,6 +2893,7 @@
         backendUrl: api.backendUrl,
         tone: toneSelect.value,
         languages: getSelectedLanguages(),
+        roman: el.roman ? el.roman.checked : true,
         candidateProfile: IV.getCandidateProfile(),
         vadConfig: api.vadConfig || null,   // env-tunable VAD timings (preload)
       }, callbacks);
@@ -2992,6 +3006,15 @@
     // Build the dropdown immediately from the hardcoded mirror + stored
     // selection so it renders before the first /api/health reconcile.
     buildLangDropdown(readStoredLanguages() || ['en']);
+    if (el.roman) {
+      el.roman.checked = readStoredRoman();
+      IV.setRoman(el.roman.checked);
+      el.roman.addEventListener('change', () => {
+        writeStoredRoman(el.roman.checked);
+        IV.setRoman(el.roman.checked);
+        if (IV.isRunning()) showError('English-letters change applies when you Stop then Start listening.');
+      });
+    }
 
     // Probe backend health (speech locale + language registry) when the
     // Interview tab first opens.

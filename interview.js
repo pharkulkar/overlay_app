@@ -58,7 +58,15 @@
     // Hinglish: Hindi-English code-mixing in Roman script. Not an ISO language;
     // a pseudo-code the backend handles specially. Placed beside Hindi.
     { code: 'hing', name: 'Hinglish', native: 'Hinglish', locale: 'hi-IN' },
+    { code: 'ur', name: 'Urdu', native: 'اردو', locale: 'ur-IN' },
     { code: 'mr', name: 'Marathi', native: 'मराठी', locale: 'mr-IN' },
+    { code: 'bn', name: 'Bengali', native: 'বাংলা', locale: 'bn-IN' },
+    { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી', locale: 'gu-IN' },
+    { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', locale: 'pa-IN' },
+    { code: 'ta', name: 'Tamil', native: 'தமிழ்', locale: 'ta-IN' },
+    { code: 'te', name: 'Telugu', native: 'తెలుగు', locale: 'te-IN' },
+    { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ', locale: 'kn-IN' },
+    { code: 'ml', name: 'Malayalam', native: 'മലയാളം', locale: 'ml-IN' },
     { code: 'zh', name: 'Chinese', native: '中文', locale: 'zh-CN' },
     { code: 'es', name: 'Spanish', native: 'Español', locale: 'es-ES' },
     { code: 'fr', name: 'French', native: 'Français', locale: 'fr-FR' },
@@ -71,11 +79,6 @@
     { code: 'it', name: 'Italian', native: 'Italiano', locale: 'it-IT' },
     { code: 'nl', name: 'Dutch', native: 'Nederlands', locale: 'nl-NL' },
     { code: 'tr', name: 'Turkish', native: 'Türkçe', locale: 'tr-TR' },
-    { code: 'ta', name: 'Tamil', native: 'தமிழ்', locale: 'ta-IN' },
-    { code: 'te', name: 'Telugu', native: 'తెలుగు', locale: 'te-IN' },
-    { code: 'bn', name: 'Bengali', native: 'বাংলা', locale: 'bn-IN' },
-    { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી', locale: 'gu-IN' },
-    { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ', locale: 'pa-IN' },
   ];
 
   // Finite UI states.
@@ -108,6 +111,7 @@
     sessionId: null,
     language: null,       // base code reported by backend (e.g. 'en')
     languages: ['en'],    // selected language set (base codes)
+    roman: true,          // "Show everything in English letters" (default ON)
     speechLocale: null,   // e.g. 'en-IN' (informational)
     tone: null,
     backendUrl: null,
@@ -341,7 +345,7 @@
       if (blob.size < 800) return; // guard against silence-only flushes
       if (state.sttWs && state.sttWs.readyState === WebSocket.OPEN) {
         blobToDataUrl(blob).then((dataUrl) => {
-          sttSend({ speaker: 'them', audio: dataUrl, filename: 'them.webm', languages: state.languages });
+          sttSend({ speaker: 'them', audio: dataUrl, filename: 'them.webm', languages: state.languages, roman: state.roman });
           state.seq++;
         }).catch(() => {});
       }
@@ -395,7 +399,7 @@
         // Show it locally AND forward it to the interview session as a final
         // utterance so the backend can detect + answer. Carry the detected
         // language through so the session tags the turn correctly.
-        emit('onTranscript', { final: true, speaker: 'them', text, language: lang || null });
+        emit('onTranscript', { final: true, speaker: 'them', text, language: lang || null, converted: !!msg.converted });
         ivSend({ type: 'transcript', text, is_final: true, speaker: 'them', timestamp: Date.now() / 1000, language: lang });
       } else if (msg.type === 'error') {
         emit('onError', { message: 'Transcription: ' + (msg.error || 'error') });
@@ -433,6 +437,7 @@
       candidate_profile: state.candidateProfile,
       language: state.language || undefined,
       languages: state.languages,
+      roman: state.roman,
     };
   }
   function sendStartFrame() { return ivSend(buildStartFrame()); }
@@ -604,7 +609,7 @@
     },
 
     // Start Listening to the interviewer. opts: {
-    //   backendUrl, tone, candidateProfile, language,
+    //   backendUrl, tone, candidateProfile, language, languages, roman (default true),
     //   onPhase,onLevel,onTranscript,onQuestionDetected,onAnswerStarted,
     //   onAnswerChunk,onAnswerCompleted,onQuestionCancelled,onError,
     //   onConnection,onSessionStarted,onDevicesChanged
@@ -622,6 +627,7 @@
       state.languages = (Array.isArray(opts.languages) && opts.languages.length)
         ? opts.languages.slice()
         : ['en'];
+      state.roman = opts.roman !== false;
       // The start-frame primary language is the first selected code.
       state.language = opts.language || state.languages[0] || null;
       state.sessionId = genId('sess');
@@ -714,6 +720,12 @@
       state.languages = (Array.isArray(codes) && codes.length) ? codes.slice() : ['en'];
     },
     getLanguages() { return state.languages.slice(); },
+    // "Show everything in English letters". Applies on the NEXT start().
+    // undefined -> true (default ON); any explicit falsy value -> false.
+    setRoman(v) { state.roman = (v === undefined) ? true : !!v; },
+    getRoman() { return state.roman; },
+    // Stored-preference parser: missing -> true; 'false'/'0' -> false.
+    parseStoredRoman(raw) { return !(raw === 'false' || raw === '0' || raw === false || raw === 0); },
     setCandidateProfile(text) { state.candidateProfile = text || null; },
     getCandidateProfile() { return state.candidateProfile; },
 
