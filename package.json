@@ -4,7 +4,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node test/interview.test.js"
+    "test": "node test/interview.test.js && node test/stealth-audit.test.js"
   },
   "devDependencies": {
     "electron": "44.7.0"

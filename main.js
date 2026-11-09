@@ -3,6 +3,7 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const StealthUI = require('./stealth-ui.js');
 
 // NOTE: hardware acceleration was previously disabled (common workaround for
 // transparent-window flicker), but it makes dragging laggy. Re-enabled for
@@ -28,8 +29,10 @@ let selectionWindow;
 
 // Current answer tone (set by the overlay UI; applied to captures).
 let currentTone = process.env.ANSWER_TONE || 'concise';
-// Capture mode: 'ocr' (default, local OCR) | 'vision' (send image to OpenAI).
-let captureMode = 'ocr';
+// Capture mode is permanently 'vision' (send image to OpenAI via the popup).
+// [OCR-DISABLED] was: // Capture mode: 'ocr' (default, local OCR) | 'vision' (send image to OpenAI).
+// [OCR-DISABLED] was: let captureMode = 'ocr';
+const captureMode = 'vision';
 
 // ── Overlay window ─────────────────────────────────────────────────────────
 
@@ -61,6 +64,24 @@ function scheduleSaveWindowState() {
   }, 300);
 }
 
+// Never open new windows or navigate away (e.g. a file dropped on the window):
+// any such surface would be a native window outside content protection.
+function lockNavigation(win) {
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  win.webContents.on('will-navigate', (e) => e.preventDefault());
+}
+
+// setBounds on a resizable:false window works on macOS (NSWindow setFrame) and
+// Windows (SetWindowPos). On Windows a non-resizable window can come back with a
+// shrunken size after a DPI change (electron#27054), so re-apply once if it differs.
+function setOverlayBounds(b) {
+  overlayWindow.setBounds(b);
+  if (process.platform === 'win32') {
+    const got = overlayWindow.getBounds();
+    if (got.width !== b.width || got.height !== b.height) overlayWindow.setBounds(b);
+  }
+}
+
 function createOverlayWindow() {
   const saved = loadWindowState();
   overlayWindow = new BrowserWindow({
@@ -71,7 +92,10 @@ function createOverlayWindow() {
     frame: false,
     transparent: true,
     alwaysOnTop: true,
-    resizable: true,
+    // Stealth: a user-resizable window makes the OS draw edge-resize cursors
+    // outside the content-protected surface. Resizing is done by the in-window
+    // grip (overlay-resize-* IPC) via setBounds, which works on non-resizable windows.
+    resizable: false,
     hasShadow: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -79,6 +103,7 @@ function createOverlayWindow() {
       nodeIntegration: false,
     },
   });
+  lockNavigation(overlayWindow);
 
   // Pin to all virtual desktops / spaces (macOS & Windows).
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -189,6 +214,7 @@ function openRegionSelector() {
   });
 
   // Apply protection + levels while still hidden.
+  lockNavigation(selectionWindow);
   selectionWindow.setContentProtection(true);
   selectionWindow.setAlwaysOnTop(true, 'screen-saver');
   selectionWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -230,15 +256,13 @@ ipcMain.on('region-cancelled', () => {
   }
 });
 
-// ── Send capture to backend /api/solve ───────────────────────────────────────
+// ── Capture delivery (vision popup) ───────────────────────────────────────
 
-// Capture -> OCR ONLY. The overlay shows the editable extracted text; the
-// user reviews/edits it and presses Ask to get an answer (/api/ask).
-// Route a finished capture by the user's capture mode. 'ocr' keeps the
-// original local-OCR flow untouched.
+// Route a finished capture: always to the vision send popup.
 function routeCapture(dataUrl, sourceType) {
-  if (captureMode === 'vision') return deliverVisionCapture(dataUrl, sourceType);
-  return sendToSolve(dataUrl, sourceType);
+  // [OCR-DISABLED] if (captureMode === 'vision') return deliverVisionCapture(dataUrl, sourceType);
+  // [OCR-DISABLED] return sendToSolve(dataUrl, sourceType);
+  return deliverVisionCapture(dataUrl, sourceType);
 }
 // Vision mode: hand the image to the renderer, which shows the send popup.
 // Main only un-hides the window; the renderer owns dot/expanded state and
@@ -248,50 +272,50 @@ function deliverVisionCapture(dataUrl, sourceType) {
   if (!overlayWindow.isVisible()) overlayWindow.show();
   sendToOverlay('vision-capture', { dataUrl, sourceType });
 }
-// Controller of the in-flight local-OCR request (null when idle). Cancelling
-// ('cancel-ocr' IPC) only stops WAITING: the backend has already saved the
-// capture/record before OCR runs, so it stays in the Gallery, and OCR itself
-// finishes in the background on the server (its result is ignored here).
-let ocrAbort = null;
-async function sendToSolve(dataUrl, sourceType) {
-  if (ocrAbort) {  // a newer capture supersedes the older wait, silently
-    ocrAbort.superseded = true;
-    ocrAbort.abort();
-  }
-  const ac = new AbortController();
-  ocrAbort = ac;
-  sendToOverlay('solve-status', { status: 'ocr' });
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/ocr-only`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl, source_type: sourceType }),
-      signal: ac.signal,
-    });
-    const data = await res.json();
-    if (ac.signal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
-    if (data.success) {
-      sendToOverlay('ocr-ready', {
-        text: data.extracted_text || '',
-        recordId: data.record_id,
-      });
-    } else {
-      sendToOverlay('solve-error', { error: data.error || 'OCR failed.' });
-    }
-  } catch (err) {
-    if (err && err.name === 'AbortError' || ac.signal.aborted) {
-      if (!ac.superseded) sendToOverlay('solve-status', { status: 'cancelled' });
-      return;
-    }
-    sendToOverlay('solve-error', { error: `Backend unreachable: ${err.message || err}` });
-  } finally {
-    if (ocrAbort === ac) ocrAbort = null;
-  }
-}
-ipcMain.on('cancel-ocr', (event) => {
-  if (!isOverlaySender(event)) return;
-  if (ocrAbort) ocrAbort.abort();
-});
+// [OCR-DISABLED] // Controller of the in-flight local-OCR request (null when idle). Cancelling
+// [OCR-DISABLED] // ('cancel-ocr' IPC) only stops WAITING: the backend has already saved the
+// [OCR-DISABLED] // capture/record before OCR runs, so it stays in the Gallery, and OCR itself
+// [OCR-DISABLED] // finishes in the background on the server (its result is ignored here).
+// [OCR-DISABLED] let ocrAbort = null;
+// [OCR-DISABLED] async function sendToSolve(dataUrl, sourceType) {
+// [OCR-DISABLED]   if (ocrAbort) {  // a newer capture supersedes the older wait, silently
+// [OCR-DISABLED]     ocrAbort.superseded = true;
+// [OCR-DISABLED]     ocrAbort.abort();
+// [OCR-DISABLED]   }
+// [OCR-DISABLED]   const ac = new AbortController();
+// [OCR-DISABLED]   ocrAbort = ac;
+// [OCR-DISABLED]   sendToOverlay('solve-status', { status: 'ocr' });
+// [OCR-DISABLED]   try {
+// [OCR-DISABLED]     const res = await fetch(`${BACKEND_URL}/api/ocr-only`, {
+// [OCR-DISABLED]       method: 'POST',
+// [OCR-DISABLED]       headers: { 'Content-Type': 'application/json' },
+// [OCR-DISABLED]       body: JSON.stringify({ image: dataUrl, source_type: sourceType }),
+// [OCR-DISABLED]       signal: ac.signal,
+// [OCR-DISABLED]     });
+// [OCR-DISABLED]     const data = await res.json();
+// [OCR-DISABLED]     if (ac.signal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+// [OCR-DISABLED]     if (data.success) {
+// [OCR-DISABLED]       sendToOverlay('ocr-ready', {
+// [OCR-DISABLED]         text: data.extracted_text || '',
+// [OCR-DISABLED]         recordId: data.record_id,
+// [OCR-DISABLED]       });
+// [OCR-DISABLED]     } else {
+// [OCR-DISABLED]       sendToOverlay('solve-error', { error: data.error || 'OCR failed.' });
+// [OCR-DISABLED]     }
+// [OCR-DISABLED]   } catch (err) {
+// [OCR-DISABLED]     if (err && err.name === 'AbortError' || ac.signal.aborted) {
+// [OCR-DISABLED]       if (!ac.superseded) sendToOverlay('solve-status', { status: 'cancelled' });
+// [OCR-DISABLED]       return;
+// [OCR-DISABLED]     }
+// [OCR-DISABLED]     sendToOverlay('solve-error', { error: `Backend unreachable: ${err.message || err}` });
+// [OCR-DISABLED]   } finally {
+// [OCR-DISABLED]     if (ocrAbort === ac) ocrAbort = null;
+// [OCR-DISABLED]   }
+// [OCR-DISABLED] }
+// [OCR-DISABLED] ipcMain.on('cancel-ocr', (event) => {
+// [OCR-DISABLED]   if (!isOverlaySender(event)) return;
+// [OCR-DISABLED]   if (ocrAbort) ocrAbort.abort();
+// [OCR-DISABLED] });
 function sendToOverlay(channel, payload) {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.webContents.send(channel, payload);
@@ -311,14 +335,19 @@ ipcMain.on('save-transcript', (event, { speaker, text }) => {
 
 // Remember the expanded size so we can restore it after the floating-dot state.
 let expandedBounds = null;
+let overlayDot = false;   // true while minimized to the floating dot
 
 ipcMain.on('toggle-overlay-mode', (event, isMinimized) => {
   if (!overlayWindow) return;
   if (isMinimized) {
     // Save current (expanded) size, then shrink to the dot.
     expandedBounds = overlayWindow.getBounds();
+    overlayDot = true;
+    dragState = null;
+    resizeState = null;
     overlayWindow.setSize(64, 64);
   } else {
+    overlayDot = false;
     // Restore the previous expanded size (fallback to a sensible default).
     const w = (expandedBounds && expandedBounds.width) || 1000;
     const h = (expandedBounds && expandedBounds.height) || 720;
@@ -376,7 +405,7 @@ ipcMain.on('overlay-drag-start', (event) => {
 ipcMain.on('overlay-drag-move', (event) => {
   if (!dragState || !isOverlaySender(event)) return;
   const cur = screen.getCursorScreenPoint();
-  overlayWindow.setBounds({
+  setOverlayBounds({
     x: Math.round(dragState.bounds.x + cur.x - dragState.cursor.x),
     y: Math.round(dragState.bounds.y + cur.y - dragState.cursor.y),
     width: dragState.bounds.width,     // size stays fixed while dragging
@@ -388,6 +417,39 @@ ipcMain.on('overlay-drag-end', (event) => {
   if (!isOverlaySender(event)) return;
   dragState = null;
   saveWindowState();   // persist the final position right away (no-op when compact)
+});
+
+// ── In-window resize grip ────────────────────────────────────────────────────
+// Same shape as drag: start / one move per frame / end, live cursor read here.
+// Top-left stays fixed; size = start size + cursor delta (clamped in stealth-ui).
+let resizeState = null;
+
+ipcMain.on('overlay-resize-start', (event) => {
+  if (!isOverlaySender(event) || overlayCompact || overlayDot) return;
+  const bounds = overlayWindow.getBounds();
+  resizeState = {
+    cursor: screen.getCursorScreenPoint(),
+    bounds,
+    workArea: screen.getDisplayMatching(bounds).workArea,
+  };
+});
+
+ipcMain.on('overlay-resize-move', (event) => {
+  if (!resizeState || !isOverlaySender(event)) return;
+  const cur = screen.getCursorScreenPoint();
+  setOverlayBounds(StealthUI.clampResize({
+    start: resizeState.bounds,
+    dx: cur.x - resizeState.cursor.x,
+    dy: cur.y - resizeState.cursor.y,
+    workArea: resizeState.workArea,
+    min: StealthUI.MIN_RESIZE,
+  }));
+});
+
+ipcMain.on('overlay-resize-end', (event) => {
+  if (!isOverlaySender(event)) return;
+  resizeState = null;
+  saveWindowState();   // persist final size (no-op when compact)
 });
 
 // ── Small solution panel ─────────────────────────────────────────────────────
@@ -406,9 +468,11 @@ ipcMain.on('set-compact-mode', (event, on) => {
     if (overlayCompact) return;
     preCompactBounds = overlayWindow.getBounds();
     overlayCompact = true;
+    dragState = null;
+    resizeState = null;
     const wa = screen.getDisplayMatching(preCompactBounds).workArea;
     const margin = 16;
-    overlayWindow.setBounds({
+    setOverlayBounds({
       x: Math.round(wa.x + wa.width - COMPACT_W - margin),
       y: Math.round(wa.y + margin),
       width: COMPACT_W,
@@ -418,7 +482,7 @@ ipcMain.on('set-compact-mode', (event, on) => {
     if (!overlayCompact) return;
     overlayCompact = false;
     if (preCompactBounds && preCompactBounds.width && preCompactBounds.height) {
-      overlayWindow.setBounds(preCompactBounds);
+      setOverlayBounds(preCompactBounds);
     }
     preCompactBounds = null;
   }
@@ -429,10 +493,10 @@ ipcMain.on('set-tone', (event, tone) => {
   if (typeof tone === 'string' && tone) currentTone = tone;
 });
 
-// Overlay UI sets the capture mode ('ocr' | 'vision'); anything else ignored.
-ipcMain.on('set-capture-mode', (event, mode) => {
-  if (mode === 'ocr' || mode === 'vision') captureMode = mode;
-});
+// [OCR-DISABLED] // Overlay UI sets the capture mode ('ocr' | 'vision'); anything else ignored.
+// [OCR-DISABLED] ipcMain.on('set-capture-mode', (event, mode) => {
+// [OCR-DISABLED]   if (mode === 'ocr' || mode === 'vision') captureMode = mode;
+// [OCR-DISABLED] });
 // NOTE: the transcript "Ask" menu is now drawn as an in-overlay HTML menu
 // inside the content-protected overlay window (see index.html). A native
 // Electron Menu.popup() renders in an OS surface that is NOT covered by
@@ -442,8 +506,8 @@ ipcMain.on('set-capture-mode', (event, mode) => {
 // ── Global shortcuts ─────────────────────────────────────────────────────────
 
 // Shared entry points: the global hotkeys AND the on-screen overlay buttons both
-// call these, so a click and a keypress always behave identically (local OCR or
-// the vision popup, per the current capture mode).
+// call these, so a click and a keypress always behave identically (always the
+// vision popup).
 function triggerFullCapture() {
   captureFullScreen().catch((err) => {
     console.error('Full capture failed:', err);

@@ -5,10 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Select Region</title>
   <style>
+    /* Stealth: the OS draws the mouse cursor OUTSIDE the content-protected window,
+       so any non-default cursor shape (e.g. crosshair) would reveal this hidden UI
+       to a screen-share viewer. Force the plain arrow everywhere. */
+    *, *::before, *::after { cursor: default !important; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%; height: 100%; overflow: hidden;
-      background: transparent !important; cursor: crosshair;
+      background: transparent !important;
       user-select: none; -webkit-user-select: none;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }

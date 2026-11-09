@@ -21,8 +21,7 @@ try {
 // In-flight cancellable requests, keyed by a caller-supplied string requestId
 // (contextBridge cannot pass an AbortSignal, so the renderer uses ids).
 // LIMITS: aborting the fetch only stops WAITING; it cannot abort the upstream
-// OpenAI call (tokens may still be consumed), and OCR already running on the
-// server finishes in the background (the UI ignores its result).
+// OpenAI call (tokens may still be consumed).
 const inflight = new Map();
 const CANCELLED = () => ({ success: false, cancelled: true, error: 'Cancelled' });
 async function trackedFetch(url, options, requestId) {
@@ -74,7 +73,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Overlay UI -> main: set the active answer tone (applied to hotkey captures)
   setTone: (tone) => ipcRenderer.send('set-tone', tone),
-  setCaptureMode: (mode) => ipcRenderer.send('set-capture-mode', mode),
+// [OCR-DISABLED]   setCaptureMode: (mode) => ipcRenderer.send('set-capture-mode', mode),
   // On-screen alternative to the capture hotkeys: kind = 'full' | 'region'.
   triggerCapture: (kind) => ipcRenderer.send('trigger-capture', kind),
   // Shrink the window into the small solution panel (true) or restore it (false).
@@ -84,18 +83,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dragStart: () => ipcRenderer.send('overlay-drag-start'),
   dragMove: () => ipcRenderer.send('overlay-drag-move'),
   dragEnd: () => ipcRenderer.send('overlay-drag-end'),
+  // In-window resize grip (the window is resizable:false so the OS never draws
+  // edge-resize cursors). Main reads the live cursor itself; no coordinates sent.
+  resizeStart: () => ipcRenderer.send('overlay-resize-start'),
+  resizeMove: () => ipcRenderer.send('overlay-resize-move'),
+  resizeEnd: () => ipcRenderer.send('overlay-resize-end'),
 
   // Main process -> overlay renderer (capture/solve lifecycle)
-  onSolveStatus: (cb) => ipcRenderer.on('solve-status', (_e, payload) => cb(payload)),
+// [OCR-DISABLED]   onSolveStatus: (cb) => ipcRenderer.on('solve-status', (_e, payload) => cb(payload)),
   onSolveAnswer: (cb) => ipcRenderer.on('solve-answer', (_e, payload) => cb(payload)),
   onSolveError: (cb) => ipcRenderer.on('solve-error', (_e, payload) => cb(payload)),
 
   // Main process -> overlay: ask-now hotkey pressed (request a suggestion)
   onAskNow: (cb) => ipcRenderer.on('ask-now', (_e, payload) => cb(payload)),
 
-  // Main process -> overlay: OCR text ready (editable before asking)
+// [OCR-DISABLED]   // Main process -> overlay: OCR text ready (editable before asking)
+  // Main process -> overlay: a capture is ready for the vision send popup
   onVisionCapture: (cb) => ipcRenderer.on('vision-capture', (_e, payload) => cb(payload)),
-  onOcrReady: (cb) => ipcRenderer.on('ocr-ready', (_e, payload) => cb(payload)),
+// [OCR-DISABLED]   onOcrReady: (cb) => ipcRenderer.on('ocr-ready', (_e, payload) => cb(payload)),
 
   // Main process -> overlay: the app is about to quit. Lets the renderer stop
   // audio capture / close sockets cleanly. One-way, no payload trusted.
@@ -124,10 +129,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     } catch (_e) { /* ignore */ }
     return !!ac;
   },
-  // Stop waiting for the main-process (hotkey/button) local OCR request.
-  cancelOcr: () => ipcRenderer.send('cancel-ocr'),
+// [OCR-DISABLED]   // Stop waiting for the main-process (hotkey/button) local OCR request.
+// [OCR-DISABLED]   cancelOcr: () => ipcRenderer.send('cancel-ocr'),
 
-  // Send one or more screenshots straight to OpenAI vision (no local OCR).
+  // Send one or more screenshots straight to OpenAI vision.
   visionAsk: async (images, mode, tone, language, sourceTypes, requestId) => {
     const body = { images, mode };
     if (tone) body.tone = tone;
@@ -163,20 +168,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const res = await fetch(`${BACKEND_URL}/api/records/${id}`);
     return res.json();
   },
-  // OCR an edited/cropped image. Creates a NEW record on the backend (the
-  // "new version" Gallery entry) with the posted image saved to disk and
-  // OCR'd. Returns { success, record_id, extracted_text }.
-  // requestId (optional) is tracked locally only; the backend never sees it.
-  ocrImage: async (dataUrl, sourceType = 'screenshot-region', requestId) => {
-    return trackedFetch(`${BACKEND_URL}/api/ocr-only`,
-      jsonPost({ image: dataUrl, source_type: sourceType }), requestId);
-  },
-  // requestId (optional) is tracked locally only: cancelling stops waiting, but
-  // /api/solve never sees the id, so the backend may still persist the answer.
-  solveRecord: async (id, force = false, tone = null, requestId) => {
-    return trackedFetch(`${BACKEND_URL}/api/solve`,
-      jsonPost({ record_id: id, force, tone }), requestId);
-  },
+// [OCR-DISABLED]   // OCR an edited/cropped image. Creates a NEW record on the backend (the
+// [OCR-DISABLED]   // "new version" Gallery entry) with the posted image saved to disk and
+// [OCR-DISABLED]   // OCR'd. Returns { success, record_id, extracted_text }.
+// [OCR-DISABLED]   // requestId (optional) is tracked locally only; the backend never sees it.
+// [OCR-DISABLED]   ocrImage: async (dataUrl, sourceType = 'screenshot-region', requestId) => {
+// [OCR-DISABLED]     return trackedFetch(`${BACKEND_URL}/api/ocr-only`,
+// [OCR-DISABLED]       jsonPost({ image: dataUrl, source_type: sourceType }), requestId);
+// [OCR-DISABLED]   },
+// [OCR-DISABLED]   // requestId (optional) is tracked locally only: cancelling stops waiting, but
+// [OCR-DISABLED]   // /api/solve never sees the id, so the backend may still persist the answer.
+// [OCR-DISABLED]   solveRecord: async (id, force = false, tone = null, requestId) => {
+// [OCR-DISABLED]     return trackedFetch(`${BACKEND_URL}/api/solve`,
+// [OCR-DISABLED]       jsonPost({ record_id: id, force, tone }), requestId);
+// [OCR-DISABLED]   },
   deleteRecord: async (id) => {
     const res = await fetch(`${BACKEND_URL}/api/records/${id}`, { method: 'DELETE' });
     return res.json();

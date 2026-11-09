@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Assistant Overlay</title>
 <style>
+  /* Stealth: the OS draws the mouse cursor OUTSIDE the content-protected window,
+     so any non-default cursor shape (hand, I-beam, crosshair, resize) would reveal
+     this hidden UI to a screen-share viewer. Force the plain arrow everywhere. */
+  *, *::before, *::after { cursor: default !important; }
   * , *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body {
@@ -52,7 +56,7 @@
   .nav { display: flex; gap: 4px; margin-left: 8px; }
   .nav-btn {
     border: none; color: #cfcfd4; background: transparent;
-    font-size: 12px; padding: 4px 10px; border-radius: 7px; cursor: pointer;
+    font-size: 12px; padding: 4px 10px; border-radius: 7px;
     transition: background 0.15s, color 0.15s;
   }
   .nav-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
@@ -60,7 +64,7 @@
   .spacer { flex: 1; }
   .icon-btn {
     border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08);
-    color: #e8e8ea; width: 24px; height: 24px; border-radius: 7px; cursor: pointer;
+    color: #e8e8ea; width: 24px; height: 24px; border-radius: 7px;
     font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center;
   }
   .icon-btn:hover { background: rgba(255,255,255,0.16); }
@@ -88,7 +92,7 @@
 
   /* Editable OCR / question input */
   #ocr-input {
-    width: 100%; min-height: 48px; max-height: 50vh; resize: vertical;
+    width: 100%; min-height: 48px; max-height: 50vh;
     background: rgba(0,0,0,0.3); color: #f2f2f4;
     border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
     padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.45;
@@ -102,7 +106,7 @@
   .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .act-btn {
     border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08);
-    color: #e8e8ea; font-size: 11px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+    color: #e8e8ea; font-size: 11px; padding: 5px 10px; border-radius: 7px;
   }
   .act-btn:hover { background: rgba(255,255,255,0.16); }
   select.tone {
@@ -118,7 +122,7 @@
     letter-spacing: 0.08em; margin: 10px 0 6px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
   .g-item { position: relative; border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px; overflow: hidden; cursor: pointer; background: #111; }
+    border-radius: 8px; overflow: hidden; background: #111; }
   .g-item:hover { border-color: rgba(255,255,255,0.3); }
   .g-item img { width: 100%; height: 58px; object-fit: cover; display: block; }
   .g-audio { width: 100%; height: 58px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
@@ -128,7 +132,7 @@
   .g-badge { position: absolute; top: 3px; left: 3px; font-size: 11px;
     background: rgba(0,0,0,0.65); border-radius: 4px; padding: 0 4px; }
   .g-del { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #fff;
-    background: rgba(163,21,21,0.8); border-radius: 4px; padding: 0 5px; cursor: pointer; }
+    background: rgba(163,21,21,0.8); border-radius: 4px; padding: 0 5px; }
 
   /* Audio capture meters */
   #view-audio .pad { flex: 1; display: flex; align-items: center; justify-content: center;
@@ -145,7 +149,7 @@
   /* Floating dot (S0) — clickable (no-drag) so expand works. */
   #floating-dot {
     width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; -webkit-app-region: no-drag;
+    -webkit-app-region: no-drag;
   }
   #floating-dot .dot {
     width: 36px; height: 36px; border-radius: 50%; background: #4c9aff;
@@ -162,7 +166,7 @@
   }
   #ctx-menu .ctx-item {
     padding: 7px 12px; font-size: 13px; color: #e8e8ea; border-radius: 5px;
-    cursor: pointer; white-space: nowrap;
+    white-space: nowrap;
   }
   #ctx-menu .ctx-item:hover { background: rgba(76,154,255,0.9); color: #fff; }
   #ctx-menu .ctx-sep { height: 1px; background: rgba(255,255,255,0.12); margin: 4px 6px; }
@@ -200,7 +204,7 @@
 
   /* Multi-select language dropdown (native <details> disclosure popover). */
   .iv-langs { position: relative; display: inline-block; }
-  .iv-langs > summary { list-style: none; cursor: pointer; user-select: none; }
+  .iv-langs > summary { list-style: none; user-select: none; }
   .iv-langs > summary::-webkit-details-marker { display: none; }
   .iv-langs-list {
     position: absolute; z-index: 50; top: calc(100% + 4px); left: 0;
@@ -210,7 +214,7 @@
   }
   .iv-langs-list label {
     display: flex; align-items: center; gap: 6px; padding: 3px 4px;
-    font-size: 11px; color: #d6d9df; cursor: pointer; white-space: nowrap;
+    font-size: 11px; color: #d6d9df; white-space: nowrap;
   }
   .iv-langs-list label:hover { background: rgba(255,255,255,0.06); border-radius: 4px; }
   .iv-langs-list input { margin: 0; }
@@ -280,7 +284,7 @@
   }
   .g-item:hover .g-actions { display: flex; }
   .g-act {
-    font-size: 11px; line-height: 1; color: #fff; cursor: pointer;
+    font-size: 11px; line-height: 1; color: #fff;
     border: 1px solid rgba(255,255,255,0.18); border-radius: 4px; padding: 2px 5px;
     background: rgba(0,0,0,0.65);
   }
@@ -303,10 +307,12 @@
   }
   #edit-head { display: flex; align-items: center; gap: 10px; }
   #edit-title { font-size: 13px; font-weight: 600; color: #fff; }
+  /* [OCR-DISABLED]
   #edit-ver-badge {
     font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
     padding: 1px 6px; border-radius: 999px; background: rgba(76,154,255,0.18); color: #9ec1ff;
   }
+  */
   #edit-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
   .edit-canvas-wrapper {
     position: relative; overflow: hidden; max-height: 55vh;
@@ -318,7 +324,7 @@
      fit the wrapper. getCanvasCoords() already converts rendered size -> pixel
      size, so crop/draw coordinates stay correct at any display scale. */
   #edit-canvas {
-    display: block; cursor: crosshair;
+    display: block;
     max-width: 100%; max-height: 55vh;
     width: auto; height: auto; object-fit: contain;
   }
@@ -326,7 +332,7 @@
     background: rgba(76,154,255,0.9); color: #fff; border-color: rgba(76,154,255,0.9);
   }
   #edit-text {
-    width: 100%; min-height: 70px; max-height: 30vh; resize: vertical;
+    width: 100%; min-height: 70px; max-height: 30vh;
     background: rgba(0,0,0,0.3); color: #f2f2f4;
     border: 1px solid rgba(255,255,255,0.14); border-radius: 10px;
     padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.45; outline: none;
@@ -339,7 +345,8 @@
   }
   #edit-status { font-size: 11px; color: #7a7f88; }
 
-  /* ── Capture settings popover + vision send popup ───────────────────── */
+  /* ── Vision send popup ───────────────────── */
+  /* [OCR-DISABLED] capture-mode settings popover CSS:
   #settings-pop {
     position: fixed; top: 38px; right: 10px; z-index: 1500; width: min(86%, 300px);
     background: rgba(18,18,26,0.97); border: 1px solid rgba(255,255,255,0.16);
@@ -350,6 +357,10 @@
   #settings-pop fieldset, #vision-popup fieldset { border: 0; margin: 0 0 6px; padding: 0; }
   #settings-pop legend, #vision-popup legend { font-size: 11px; color: #9aa0aa; padding: 0 0 4px; }
   #settings-pop label, #vision-popup fieldset label { display: block; padding: 3px 0; cursor: pointer; }
+  */
+  #vision-popup fieldset { border: 0; margin: 0 0 6px; padding: 0; }
+  #vision-popup legend { font-size: 11px; color: #9aa0aa; padding: 0 0 4px; }
+  #vision-popup fieldset label { display: block; padding: 3px 0; }
   #vision-popup {
     position: fixed; inset: 0; z-index: 2100; display: flex;
     align-items: center; justify-content: center;
@@ -372,12 +383,13 @@
   .vp-rm {
     position: absolute; top: -5px; right: -5px; width: 16px; height: 16px; padding: 0;
     border-radius: 50%; border: 0; background: rgba(163,21,21,0.95); color: #fff;
-    font-size: 10px; line-height: 16px; cursor: pointer; -webkit-app-region: no-drag;
+    font-size: 10px; line-height: 16px; -webkit-app-region: no-drag;
   }
   .vp-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  .vp-actions .act-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .vp-actions .act-btn:disabled { opacity: 0.45; }
   .vp-error { font-size: 11px; color: #ffb4b4; min-height: 14px; word-break: break-word; }
-  #btn-settings:focus-visible, #settings-pop input:focus-visible, #vision-popup input:focus-visible,
+  /* [OCR-DISABLED] was: #btn-settings:focus-visible, #settings-pop input:focus-visible, (selectors removed) */
+  #vision-popup input:focus-visible,
   #vision-popup button:focus-visible { outline: 2px solid rgba(76,154,255,0.9); outline-offset: 2px; }
 
   /* ── Small solution panel (the whole window shrinks to this) ─────────── */
@@ -393,7 +405,7 @@
   #compact-title { flex: 1; font-size: 12px; font-weight: 600; color: #fff; }
   #compact-body {
     flex: 1; min-height: 0; overflow: auto; font-size: 13px; line-height: 1.5;
-    user-select: text; -webkit-user-select: text; cursor: text;
+    user-select: text; -webkit-user-select: text;
   }
   .cv-text { white-space: pre-wrap; word-break: break-word; margin: 0 0 8px; }
   .cv-lang { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #7a7f88; margin: 0 0 3px; }
@@ -404,6 +416,74 @@
     font-size: 12px; line-height: 1.45; tab-size: 4;
     white-space: pre; overflow-x: auto;   /* keep lines intact so it can be typed as-is */
   }
+
+  /* ── Stealth layer: in-overlay tooltip / dropdown / dialog / resize grip ──
+     Everything here is drawn INSIDE the content-protected window (never a native
+     tooltip, <select> popup, dialog or window-edge cursor). */
+  textarea { resize: none; }   /* no OS/Chromium resizer handle on textareas */
+  #overlay-card { position: relative; }
+  #resize-grip {
+    position: absolute; right: 3px; bottom: 3px; width: 14px; height: 14px; z-index: 5;
+    opacity: 0.5; touch-action: none; -webkit-app-region: no-drag;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.85) 1px, transparent 1.6px);
+    background-size: 4.5px 4.5px;
+    clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  }
+  #resize-grip:hover { opacity: 1; }
+
+  #sd-tooltip {
+    position: fixed; z-index: 4000; display: none; pointer-events: none; max-width: 260px;
+    font-size: 11px; line-height: 1.35; padding: 5px 8px; border-radius: 6px;
+    background: rgba(18,18,26,0.96); border: 1px solid rgba(255,255,255,0.16);
+    color: #e8e8ea; box-shadow: 0 6px 18px rgba(0,0,0,0.45); word-break: break-word;
+  }
+  #sd-tooltip.show { display: block; }
+
+  .sd-select { position: relative; display: inline-block; -webkit-app-region: no-drag; }
+  .sd-select.fill { display: block; min-width: 0; }
+  .sd-native {
+    position: absolute !important; width: 1px; height: 1px; opacity: 0; overflow: hidden;
+    pointer-events: none; clip-path: inset(50%); left: 0; top: 0;
+  }
+  .sd-trigger {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    width: 100%; text-align: left; font-family: inherit;
+    background: #1c1c24; color: #e8e8ea; border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 7px; font-size: 11px; padding: 4px 6px; -webkit-app-region: no-drag;
+  }
+  .sd-trigger:disabled { opacity: 0.5; }
+  .sd-trigger:focus-visible { outline: 2px solid rgba(76,154,255,0.9); outline-offset: 1px; }
+  .sd-trigger .sd-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sd-trigger .sd-caret { font-size: 9px; color: #9aa0aa; flex: none; }
+  #sd-list {
+    position: fixed; z-index: 3400; display: none; overflow-y: auto; padding: 4px;
+    background: #1d1f24; border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5); -webkit-app-region: no-drag;
+  }
+  #sd-list.show { display: block; }
+  .sd-opt {
+    padding: 5px 8px; font-size: 11px; color: #e8e8ea; border-radius: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sd-opt.active { background: rgba(76,154,255,0.9); color: #fff; }
+  .sd-opt[aria-selected="true"]::before { content: "✓ "; }
+  .sd-opt[aria-disabled="true"] { opacity: 0.45; }
+
+  #sd-dialog {
+    position: fixed; inset: 0; z-index: 3500; display: none; align-items: center;
+    justify-content: center; background: rgba(0,0,0,0.55); -webkit-app-region: no-drag;
+  }
+  #sd-dialog.show { display: flex; }
+  #sd-dialog-card {
+    width: min(92%, 360px); display: flex; flex-direction: column; gap: 12px;
+    background: rgba(18,18,26,0.97); border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 12px; padding: 14px; color: #e8e8ea; font-size: 13px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.55);
+  }
+  #sd-dialog-msg { line-height: 1.45; word-break: break-word; white-space: pre-wrap; }
+  #sd-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  #sd-dialog-actions .act-btn.danger { background: rgba(163,21,21,0.85); border-color: rgba(163,21,21,0.95); }
+  #sd-dialog-actions .act-btn:focus-visible { outline: 2px solid rgba(76,154,255,0.9); outline-offset: 2px; }
 
   ::-webkit-scrollbar { width: 8px; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
@@ -423,8 +503,10 @@
       <button class="nav-btn" id="nav-audio">Audio</button>
     </div>
     <span class="spacer"></span>
+    <!-- [OCR-DISABLED] capture-mode settings gear (only one mode remains)
     <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">⚙︎</button>
-    <button class="icon-btn" id="btn-minimize" title="Minimize to dot">—</button>
+    -->
+    <button class="icon-btn" id="btn-minimize" data-tip="Minimize to dot" aria-label="Minimize to dot">—</button>
   </div>
 
   <!-- One-time consent / privacy notice (dismissed flag in localStorage) -->
@@ -441,19 +523,19 @@
 
   <!-- S1: Answer -->
   <div class="view" id="view-answer">
-    <!-- Editable extracted text (OCR) -> edit -> Ask -->
-    <div class="zone-label interactive" id="input-toggle" style="cursor:pointer; display:flex; align-items:center; gap:6px;">
-      <span id="input-caret">▾</span> Extracted text (edit, then Ask)
+    <!-- Question box: type a question -> Ask -->
+    <div class="zone-label interactive" id="input-toggle" style="display:flex; align-items:center; gap:6px;">
+      <span id="input-caret">▾</span> Question (type, then Ask)
     </div>
-    <textarea id="ocr-input" class="interactive" placeholder="Use the Capture buttons below (or ⌘⇧1 full · ⌘⇧2 region) — the extracted text appears here to edit, or type your own question."></textarea>
+    <textarea id="ocr-input" class="interactive" placeholder="Type your question and press Ask, or use the Capture buttons below (or ⌘⇧1 full · ⌘⇧2 region) to send a screenshot to OpenAI."></textarea>
     <div class="actions interactive">
-      <button class="act-btn" id="btn-capture-full" title="Capture the whole screen (same as ⌘⇧1)">🖥 Capture screen</button>
-      <button class="act-btn" id="btn-capture-region" title="Drag to select an area (same as ⌘⇧2)">✂ Capture region</button>
-      <button class="act-btn" id="btn-ask" title="Ask OpenAI with the text above">➤ Ask</button>
-      <button class="act-btn" id="btn-clear-input" title="Clear the text box">Clear</button>
+      <button class="act-btn" id="btn-capture-full" data-tip="Capture the whole screen (same as ⌘⇧1)">🖥 Capture screen</button>
+      <button class="act-btn" id="btn-capture-region" data-tip="Drag to select an area (same as ⌘⇧2)">✂ Capture region</button>
+      <button class="act-btn" id="btn-ask" data-tip="Ask OpenAI with the text above">➤ Ask</button>
+      <button class="act-btn" id="btn-clear-input" data-tip="Clear the text box">Clear</button>
       <span class="spacer"></span>
       <span class="zone-label">Tone</span>
-      <select class="tone" id="tone-select">
+      <select class="tone" id="tone-select" data-sd-select>
         <option value="concise">Concise</option>
         <option value="detailed">Detailed</option>
         <option value="professional">Professional</option>
@@ -467,14 +549,14 @@
       <div id="answer-body"><span class="muted">The answer will appear here after you press Ask.</span></div>
     </div>
     <div class="actions interactive">
-      <button class="act-btn" id="btn-regenerate" title="Re-ask with the current text + tone">↻ Regenerate</button>
+      <button class="act-btn" id="btn-regenerate" data-tip="Re-ask with the current text + tone">↻ Regenerate</button>
       <button class="act-btn" id="btn-copy">⧉ Copy answer</button>
-      <button class="act-btn" id="btn-popout" title="Show this solution in a small window you can type from">🗗 Pop out solution</button>
+      <button class="act-btn" id="btn-popout" data-tip="Show this solution in a small window you can type from">🗗 Pop out solution</button>
     </div>
 
     <!-- Previous answers for this record (newest first) -->
     <div id="history-wrap" class="interactive hidden">
-      <div id="history-toggle" class="zone-label" style="cursor:pointer;"><span id="history-caret">▸</span> <span id="history-count">History</span></div>
+      <div id="history-toggle" class="zone-label"><span id="history-caret">▸</span> <span id="history-count">History</span></div>
       <div id="history-list" class="hidden" style="margin-top:6px; max-height:140px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
     </div>
   </div>
@@ -483,28 +565,37 @@
   <div class="view hidden" id="view-interview">
     <!-- Controls -->
     <div class="actions interactive" style="flex-wrap:wrap;">
-      <button class="act-btn" id="iv-start" title="Begin listening to the interviewer">▶ Start Listening</button>
-      <button class="act-btn" id="iv-pause" title="Pause listening" disabled>⏸ Pause</button>
-      <button class="act-btn" id="iv-resume" title="Resume listening" disabled>▶ Resume</button>
-      <button class="act-btn" id="iv-stop" title="Stop listening" disabled>■ Stop</button>
-      <details id="iv-langs" class="iv-langs" title="Select the languages the interviewer may speak">
+      <button class="act-btn" id="iv-start" data-tip="Begin listening to the interviewer">▶ Start Listening</button>
+      <button class="act-btn" id="iv-pause" data-tip="Pause listening" disabled>⏸ Pause</button>
+      <button class="act-btn" id="iv-resume" data-tip="Resume listening" disabled>▶ Resume</button>
+      <button class="act-btn" id="iv-stop" data-tip="Stop listening" disabled>■ Stop</button>
+      <details id="iv-langs" class="iv-langs" data-tip="Select the languages the interviewer may speak">
         <summary class="act-btn" id="iv-lang-summary">Languages: EN</summary>
         <div class="iv-langs-list" id="iv-langs-list"></div>
       </details>
       <!-- Resume (CV) document controls. The iv-cv-* prefix is deliberate:
            #iv-resume above is the "Resume listening" playback control. -->
       <input type="file" id="iv-cv-input" accept=".pdf,.docx,.txt" style="display:none;">
-      <button class="act-btn" id="iv-cv-btn" title="Upload a resume to set the interview context">📄 Upload Resume</button>
+      <button class="act-btn" id="iv-cv-btn" data-tip="Upload a resume to set the interview context">📄 Upload Resume</button>
+      <button class="act-btn" id="iv-cv-paste-btn" type="button" data-tip="Paste your resume as text instead of choosing a file">Paste text instead</button>
       <span class="iv-meta" id="iv-cv-label">No resume</span>
-      <button class="act-btn" id="iv-cv-clear" title="Clear the loaded resume">✕</button>
+      <button class="act-btn" id="iv-cv-clear" data-tip="Clear the loaded resume" aria-label="Clear the loaded resume">✕</button>
       <span class="spacer"></span>
-      <button class="act-btn" id="iv-clear" title="Clear the transcript and all Q&amp;A cards">🗑 Clear</button>
+      <button class="act-btn" id="iv-clear" data-tip="Clear the transcript and all Q&amp;A cards">🗑 Clear</button>
+    </div>
+    <div class="iv-meta interactive" id="iv-cv-hint" style="font-size:10px;">Tip: choose the file before you start sharing your screen - the system file picker can be visible to others.</div>
+    <div id="iv-cv-paste" class="interactive hidden" style="display:flex; flex-direction:column; gap:6px;">
+      <textarea id="iv-cv-text" rows="6" placeholder="Paste your resume text here" aria-label="Resume text"></textarea>
+      <div class="actions">
+        <button class="act-btn" id="iv-cv-paste-submit" type="button">Use this text</button>
+        <button class="act-btn" id="iv-cv-paste-cancel" type="button">Cancel</button>
+      </div>
     </div>
 
     <!-- Compact live status strip. -->
     <div id="iv-statusbar" class="interactive">
       <span class="iv-pill" id="iv-state" data-state="STOPPED"><span class="live-dot"></span><span id="iv-state-label">Stopped</span></span>
-      <span class="iv-meter" title="Interviewer audio level"><span id="iv-level"></span></span>
+      <span class="iv-meter" data-tip="Interviewer audio level" aria-label="Interviewer audio level"><span id="iv-level"></span></span>
       <span class="iv-meta" id="iv-source-meta">Interviewer (system audio)</span>
       <span class="spacer"></span>
       <span class="iv-meta" id="iv-locale"></span>
@@ -550,33 +641,33 @@
       <span class="meter mini"><span class="meter-fill" id="meter-me"></span></span>
       <span class="meter mini"><span class="meter-fill them" id="meter-them"></span></span>
       <span class="spacer"></span>
-      <button class="act-btn" id="audio-devices-toggle" title="Device settings">⚙︎</button>
-      <button class="act-btn" id="btn-ask-now" title="Ask about the latest (⌘⇧A)">💡 Ask latest</button>
+      <button class="act-btn" id="audio-devices-toggle" data-tip="Device settings" aria-label="Device settings">⚙︎</button>
+      <button class="act-btn" id="btn-ask-now" data-tip="Ask about the latest (⌘⇧A)">💡 Ask latest</button>
     </div>
 
     <!-- Device settings (collapsed by default) -->
     <div id="audio-devices" class="interactive hidden" style="display:flex; flex-direction:column; gap:6px; background:rgba(0,0,0,0.2); border-radius:8px; padding:8px;">
       <div style="display:flex; align-items:center; gap:8px;">
         <span class="zone-label" style="color:#4cd964; min-width:46px;">Me</span>
-        <select class="tone interactive" id="dev-me" style="flex:1;"></select>
+        <select class="tone interactive" id="dev-me" data-sd-select style="flex:1;"></select>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
         <span class="zone-label" style="color:#4c9aff; min-width:46px;">Them</span>
-        <select class="tone interactive" id="dev-them" style="flex:1;"></select>
+        <select class="tone interactive" id="dev-them" data-sd-select style="flex:1;"></select>
       </div>
-      <button class="act-btn" id="audio-refresh" title="Re-scan devices" style="align-self:flex-start;">↻ Rescan devices</button>
+      <button class="act-btn" id="audio-refresh" data-tip="Re-scan devices" style="align-self:flex-start;">↻ Rescan devices</button>
     </div>
 
     <!-- Live transcript — the hero. Select text, right-click, Ask. -->
     <div style="display:flex; align-items:center; gap:8px;">
       <span class="zone-label">Live transcript — select text, right-click → Ask</span>
       <span class="spacer"></span>
-      <button class="act-btn" id="transcript-save" title="Opt-in: write transcript to disk">💾</button>
-      <button class="act-btn" id="transcript-clear" title="Clear transcript">Clear</button>
+      <button class="act-btn" id="transcript-save" data-tip="Opt-in: write transcript to disk" aria-label="Save transcript to disk">💾</button>
+      <button class="act-btn" id="transcript-clear" data-tip="Clear transcript">Clear</button>
     </div>
     <div id="transcript-live" class="interactive" style="flex:1; min-height:140px; overflow-y:auto;
          background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.08);
-         border-radius:10px; padding:12px; font-size:13px; line-height:1.55; user-select:text; cursor:text;">
+         border-radius:10px; padding:12px; font-size:13px; line-height:1.55; user-select:text;">
       <span class="muted">Press Start — the other person's speech appears here. Select any text and right-click to Ask.</span>
     </div>
 
@@ -597,6 +688,10 @@
       <span class="muted">Select transcript text → right-click → Ask, or press "Ask latest".</span>
     </div>
   </div>
+
+  <!-- Resize grip (bottom-right). The window is resizable:false so the OS never draws
+       edge-resize cursors; initWindowResize drives the resize through IPC instead. -->
+  <div id="resize-grip" class="no-window-drag" data-tip="Drag to resize" aria-hidden="true"></div>
 </div>
 
 <!-- In-overlay right-click menu for transcript selection (content-protected) -->
@@ -608,15 +703,15 @@
 </div>
 
 <!-- Edit modal — in-overlay (content-protected). Image records get the canvas
-     editor (draw/crop) + OCR + Get Answer; manual/audio records get a text
+     editor (draw/crop) + vision button; manual/audio records get a text
      editor + Get Answer. -->
 <div id="edit-modal" class="interactive">
   <div id="edit-card">
     <div id="edit-head">
       <span id="edit-title">Edit</span>
-      <span id="edit-ver-badge" class="hidden"></span>
+      <!-- [OCR-DISABLED] <span id="edit-ver-badge" class="hidden"></span> -->
       <span class="spacer"></span>
-      <button class="icon-btn" id="edit-close" title="Close">✕</button>
+      <button class="icon-btn" id="edit-close" data-tip="Close" aria-label="Close">✕</button>
     </div>
 
     <div id="edit-body">
@@ -631,9 +726,11 @@
         <div class="edit-canvas-wrapper">
           <canvas id="edit-canvas"></canvas>
         </div>
+        <!-- [OCR-DISABLED]
         <div class="actions" style="margin-top:8px;">
           <button class="act-btn" id="edit-ocr">⚡ Perform OCR / Get text from image</button>
         </div>
+        -->
         <!-- Send the image (as it is now, edited or not) straight to OpenAI vision. -->
         <fieldset id="edit-vision-box" style="border:1px solid rgba(255,255,255,0.14); border-radius:8px; margin-top:8px; padding:8px 10px;">
           <legend class="zone-label" style="padding:0 6px;">Or send the image straight to OpenAI</legend>
@@ -645,15 +742,15 @@
               <input type="radio" name="edit-vision-mode" id="edit-vm-scenario" value="scenario"> Scenario-based solution
             </label>
             <span class="spacer"></span>
-            <button class="act-btn" id="edit-vision-send" title="Sends the image exactly as shown (with any crop or drawing) to OpenAI">🧠 Get solution from image</button>
+            <button class="act-btn" id="edit-vision-send" data-tip="Sends the image exactly as shown (with any crop or drawing) to OpenAI">🧠 Get solution from image</button>
           </div>
           <div class="muted" style="font-size:10px; margin-top:4px;">The image leaves your machine only when you press this button.</div>
         </fieldset>
       </div>
 
-      <!-- Extracted / editable text (both image and text records) -->
-      <div class="zone-label" id="edit-text-label">Extracted text (edit, then Get Answer)</div>
-      <textarea id="edit-text" placeholder="Text appears here after OCR, or edit the question text."></textarea>
+      <!-- Editable question text (text/voice records only; hidden for image records) -->
+      <div class="zone-label" id="edit-text-label">Question text (edit, then Get Answer)</div>
+      <textarea id="edit-text" placeholder="Edit the question text."></textarea>
 
       <div class="actions">
         <button class="act-btn" id="edit-get-answer">➤ Get Answer</button>
@@ -664,14 +761,14 @@
       <div style="display:flex; align-items:center; gap:8px;">
         <div class="zone-label">Answer</div>
         <span class="spacer"></span>
-        <button class="act-btn" id="edit-popout" title="Show this solution in a small window you can type from">🗗 Pop out solution</button>
+        <button class="act-btn" id="edit-popout" data-tip="Show this solution in a small window you can type from">🗗 Pop out solution</button>
       </div>
-      <div id="edit-answer"><span class="muted">The answer will appear here after you press Get Answer.</span></div>
+      <div id="edit-answer"><span class="muted">The answer will appear here.</span></div>
     </div>
   </div>
 </div>
 
-<!-- Capture settings popover (in-overlay so it stays content-protected) -->
+<!-- [OCR-DISABLED] Capture settings popover (capture-mode setting removed)
 <div id="settings-pop" class="hidden interactive" role="dialog" aria-label="Capture settings">
   <fieldset>
     <legend>Capture mode</legend>
@@ -680,8 +777,9 @@
   </fieldset>
   <div class="muted" id="cm-note">Images are sent to OpenAI only in this mode, and only when you press Send.</div>
 </div>
+-->
 
-<!-- Vision send popup: shown after a hotkey capture in "vision" mode -->
+<!-- Vision send popup: shown after every capture (hotkey or button) -->
 <div id="vision-popup" class="hidden interactive" role="dialog" aria-modal="true" aria-labelledby="vp-title">
   <div id="vp-card">
     <div id="vp-title">Send to OpenAI · <span id="vp-count"></span></div>
@@ -691,6 +789,7 @@
       <label for="vm-coding"><input type="radio" name="vision-mode" id="vm-coding" value="coding" checked> Coding solution</label>
       <label for="vm-scenario"><input type="radio" name="vision-mode" id="vm-scenario" value="scenario"> Scenario-based explanation</label>
     </fieldset>
+    <div class="muted" id="vp-note" style="font-size:10px;">Images are sent to OpenAI only when you press Send.</div>
     <div id="vp-msg" class="vp-error" role="status" aria-live="polite"></div>
     <div class="vp-actions">
       <button class="act-btn" id="vp-add">Add another image</button>
@@ -705,13 +804,13 @@
 <div id="compact-view" class="hidden" role="region" aria-label="Solution">
   <div id="compact-head">
     <span id="compact-title">Solution</span>
-    <button class="act-btn" id="compact-restore" title="Show the full overlay again">⤢ Full overlay</button>
+    <button class="act-btn" id="compact-restore" data-tip="Show the full overlay again">⤢ Full overlay</button>
   </div>
   <div id="compact-body" class="interactive"></div>
 </div>
 
 <!-- Floating dot (S0) -->
-<div id="floating-dot" class="hidden" title="Click to expand">
+<div id="floating-dot" class="hidden" data-tip="Click to expand" aria-label="Expand overlay">
   <div class="dot"></div>
 </div>
 
@@ -720,6 +819,397 @@
 <script src="vision-batch.js"></script>
 <script src="solution-format.js"></script>
 <script src="ux-helpers.js"></script>
+<script src="stealth-ui.js"></script>
+<script>
+  // ══════════════════════════════════════════════════════════════════════
+  // Stealth layer. content protection hides what is drawn INSIDE this window,
+  // but OS-drawn surfaces leak to a screen-share viewer: native tooltips, native
+  // <select> popups, native confirm/alert dialogs. This block replaces them with
+  // in-window equivalents. Pure logic lives in stealth-ui.js (window.StealthUI).
+  // ══════════════════════════════════════════════════════════════════════
+  (function stealthLayer() {
+    const SU = window.StealthUI;
+
+    // ── Tooltips: the ONLY place that converts a title attribute to data-tip ──
+    function convertTitle(el) {
+      const title = el.getAttribute('title');
+      if (title === null) return;
+      const d = SU.decideTitleConversion({
+        title, tip: el.getAttribute('data-tip'),
+        ariaLabel: el.getAttribute('aria-label'), text: el.textContent,
+      });
+      el.removeAttribute('title');
+      if (d.tip) el.setAttribute('data-tip', d.tip);
+      if (d.ariaLabel) el.setAttribute('aria-label', d.ariaLabel);
+    }
+    function convertTitles(root) {
+      if (root.nodeType === 1 && root.hasAttribute('title')) convertTitle(root);
+      if (root.querySelectorAll) root.querySelectorAll('[title]').forEach(convertTitle);
+    }
+
+    const tip = document.createElement('div');
+    tip.id = 'sd-tooltip';
+    tip.setAttribute('role', 'tooltip');
+    document.body.appendChild(tip);
+    let tipTimer = 0, tipTarget = null, tipShownOn = null;
+
+    function hideTip() {
+      clearTimeout(tipTimer); tipTimer = 0;
+      tip.classList.remove('show');
+      if (tipShownOn) { tipShownOn.removeAttribute('aria-describedby'); tipShownOn = null; }
+    }
+    function showTip(el) {
+      if (!el.isConnected || el.disabled) return;
+      const text = el.getAttribute('data-tip');
+      if (!text) return;
+      tip.textContent = text;
+      tip.classList.add('show');
+      const r = el.getBoundingClientRect();
+      const pos = SU.tooltipPosition({
+        anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+        tip: { width: tip.offsetWidth, height: tip.offsetHeight },
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+      });
+      tip.style.left = pos.left + 'px';
+      tip.style.top = pos.top + 'px';
+      el.setAttribute('aria-describedby', 'sd-tooltip');
+      tipShownOn = el;
+    }
+    function scheduleTip(el) {
+      hideTip();
+      if (el) tipTimer = setTimeout(() => showTip(el), 400);
+    }
+    const tipHost = (t) => (t && t.closest ? t.closest('[data-tip]') : null);
+
+    document.addEventListener('mouseover', (e) => {
+      const el = tipHost(e.target);
+      if (el === tipTarget) return;
+      tipTarget = el;
+      scheduleTip(el);
+    });
+    document.addEventListener('mouseout', (e) => {
+      if (tipTarget && e.relatedTarget && tipTarget.contains(e.relatedTarget)) return;
+      tipTarget = null;
+      hideTip();
+    });
+    document.addEventListener('focusin', (e) => {
+      const el = tipHost(e.target);
+      // Only keyboard focus; a mouse click also focuses a button and must not pop a tip.
+      if (el && el.matches(':focus-visible')) { tipTarget = el; scheduleTip(el); }
+    });
+    document.addEventListener('focusout', hideTip);
+    ['mousedown', 'keydown', 'wheel'].forEach((t) => document.addEventListener(t, hideTip, true));
+    document.addEventListener('scroll', hideTip, true);
+    window.addEventListener('blur', hideTip);
+    // No native context menu either (the transcript has its own in-overlay menu).
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    // ── Dropdowns: custom in-overlay replacement for native <select> popups ──
+    const list = document.createElement('div');
+    list.id = 'sd-list';
+    list.className = 'no-window-drag';
+    list.setAttribute('role', 'listbox');
+    document.body.appendChild(list);
+    let openCtl = null;      // control currently showing the list
+    let swallowSpaceUp = false;
+    let typeBuf = '', typeTimer = 0;
+    let uid = 0;
+
+    function closeOpen(refocus) {
+      if (!openCtl) return;
+      const c = openCtl;
+      openCtl = null;
+      list.classList.remove('show');
+      list.textContent = '';
+      list.removeAttribute('aria-labelledby');
+      c.trigger.setAttribute('aria-expanded', 'false');
+      c.trigger.removeAttribute('aria-activedescendant');
+      if (refocus) c.trigger.focus();
+    }
+
+    function enhanceSelect(select) {
+      if (!select || select.dataset.enhanced) return;
+      select.dataset.enhanced = 'true';
+      const id = ++uid;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'sd-select';
+      if (select.style.flex) { wrap.classList.add('fill'); wrap.style.flex = select.style.flex; }
+      const trigger = document.createElement('button');
+      trigger.type = 'button';
+      trigger.className = 'sd-trigger';
+      trigger.setAttribute('role', 'combobox');
+      trigger.setAttribute('aria-haspopup', 'listbox');
+      trigger.setAttribute('aria-expanded', 'false');
+      trigger.setAttribute('aria-controls', 'sd-list');
+      const prev = select.previousElementSibling;
+      trigger.setAttribute('aria-label', select.getAttribute('aria-label')
+        || (prev && prev.classList.contains('zone-label') && prev.textContent.trim()) || select.id || 'Select');
+      const label = document.createElement('span');
+      label.className = 'sd-label';
+      const caret = document.createElement('span');
+      caret.className = 'sd-caret';
+      caret.setAttribute('aria-hidden', 'true');
+      caret.textContent = '▾';
+      trigger.appendChild(label);
+      trigger.appendChild(caret);
+
+      select.parentNode.insertBefore(wrap, select);
+      wrap.appendChild(trigger);
+      wrap.appendChild(select);
+      // Keep the real <select> in the DOM (value/options/change keep working) but hidden.
+      select.classList.add('sd-native');
+      select.setAttribute('aria-hidden', 'true');
+      select.tabIndex = -1;
+
+      const ctl = { select, trigger, active: -1 };
+      let last = null;
+
+      function rows() {
+        list.textContent = '';
+        last.items.forEach((it, i) => {
+          const row = document.createElement('div');
+          row.className = 'sd-opt';
+          row.id = 'sd-opt-' + id + '-' + i;
+          row.setAttribute('role', 'option');
+          row.setAttribute('aria-selected', i === last.selectedIndex ? 'true' : 'false');
+          if (it.disabled) row.setAttribute('aria-disabled', 'true');
+          row.textContent = it.label;
+          row.addEventListener('mousedown', (e) => e.preventDefault());   // keep focus on the trigger
+          row.addEventListener('mouseenter', () => setActive(i));
+          row.addEventListener('click', () => choose(i));
+          list.appendChild(row);
+        });
+      }
+      function setActive(i) {
+        ctl.active = i;
+        Array.prototype.forEach.call(list.children, (r, k) => r.classList.toggle('active', k === i));
+        const row = list.children[i];
+        if (row) {
+          trigger.setAttribute('aria-activedescendant', row.id);
+          row.scrollIntoView({ block: 'nearest' });
+        }
+      }
+      function place() {
+        const r = trigger.getBoundingClientRect();
+        list.style.maxHeight = 'none';
+        list.style.width = 'auto';
+        const pos = SU.dropdownPosition({
+          anchor: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+          contentHeight: list.scrollHeight,
+          viewport: { width: window.innerWidth, height: window.innerHeight },
+          minWidth: Math.max(r.width, 120),
+        });
+        list.style.left = pos.left + 'px';
+        list.style.top = pos.top + 'px';
+        list.style.width = pos.width + 'px';
+        list.style.maxHeight = pos.maxHeight + 'px';
+      }
+      function open() {
+        if (trigger.disabled || !last || !last.items.length) return;
+        closeOpen(false);
+        openCtl = ctl;
+        rows();
+        list.classList.add('show');
+        trigger.setAttribute('aria-expanded', 'true');
+        place();
+        setActive(last.selectedIndex);
+      }
+      function choose(i) {
+        const item = last.items[i];
+        if (!item || item.disabled) return;
+        const changed = select.value !== item.value;
+        if (changed) select.value = item.value;            // shim below re-renders
+        closeOpen(true);
+        if (changed) select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      ctl.choose = choose;
+
+      function render() {
+        const snap = SU.snapshotOptions(Array.prototype.slice.call(select.options), select.value, select.disabled);
+        if (SU.optionsEqual(snap, last)) return;
+        last = snap;
+        const cur = snap.items[snap.selectedIndex];
+        label.textContent = cur ? cur.label : '';
+        trigger.disabled = snap.disabled;
+        if (openCtl === ctl) {
+          if (!snap.items.length || snap.disabled) closeOpen(false);
+          else { rows(); place(); setActive(Math.min(Math.max(ctl.active, 0), snap.items.length - 1)); }
+        }
+      }
+      ctl.render = render;
+
+      // Programmatic changes that fire no DOM mutation (select.value = x) re-sync via a shim;
+      // the getters/setters delegate to the native ones so existing code is unaffected.
+      ['value', 'selectedIndex', 'disabled'].forEach((prop) => {
+        const d = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, prop);
+        Object.defineProperty(select, prop, {
+          configurable: true,
+          get() { return d.get.call(this); },
+          set(v) { d.set.call(this, v); render(); },
+        });
+      });
+      // Repopulated options (fillDeviceSelect) and attribute changes.
+      new MutationObserver(render).observe(select, {
+        childList: true, subtree: true, characterData: true,
+        attributes: true, attributeFilter: ['disabled', 'value', 'selected', 'label'],
+      });
+      select.addEventListener('change', render);
+
+      trigger.addEventListener('click', () => { if (openCtl === ctl) closeOpen(false); else open(); });
+      trigger.addEventListener('keydown', (e) => {
+        if (openCtl === ctl) return;   // window-level handler owns the open state
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(); }
+      });
+      ctl.setActive = setActive;
+      ctl.items = () => last.items;
+      render();
+    }
+
+    // Open-dropdown keyboard handling (window capture: runs before the edit
+    // modal's Escape handler, and works wherever focus is).
+    window.addEventListener('keydown', (e) => {
+      if (!openCtl) return;
+      const c = openCtl, items = c.items();
+      const stop = () => { e.preventDefault(); e.stopPropagation(); };
+      if (e.key === 'Escape') { stop(); closeOpen(true); return; }
+      if (e.key === 'Tab') { closeOpen(false); return; }
+      if (['ArrowDown', 'ArrowUp', 'Home', 'End'].indexOf(e.key) >= 0) {
+        stop();
+        const n = SU.nextIndex(items, c.active, e.key);
+        if (n >= 0) c.setActive(n);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        stop();
+        if (e.key === ' ') swallowSpaceUp = true;   // the button's click-on-keyup must not reopen
+        c.choose(c.active);
+        return;
+      }
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        stop();
+        typeBuf += e.key;
+        clearTimeout(typeTimer);
+        typeTimer = setTimeout(() => { typeBuf = ''; }, 700);
+        const n = SU.typeaheadIndex(items, c.active, typeBuf);
+        if (n >= 0) c.setActive(n);
+      }
+    }, true);
+    window.addEventListener('keyup', (e) => {
+      if (swallowSpaceUp && e.key === ' ') { swallowSpaceUp = false; e.preventDefault(); e.stopPropagation(); }
+    }, true);
+    document.addEventListener('mousedown', (e) => {
+      if (openCtl && !list.contains(e.target) && !openCtl.trigger.contains(e.target)) closeOpen(false);
+    }, true);
+    window.addEventListener('blur', () => closeOpen(false));
+    window.addEventListener('resize', () => closeOpen(false));
+    document.addEventListener('scroll', (e) => { if (openCtl && e.target !== list) closeOpen(false); }, true);
+
+    // ── Dialogs: promise-based in-overlay confirm / notice ────────────────────
+    const dlg = document.createElement('div');
+    dlg.id = 'sd-dialog';
+    dlg.className = 'no-window-drag';
+    const card = document.createElement('div');
+    card.id = 'sd-dialog-card';
+    card.setAttribute('role', 'alertdialog');
+    card.setAttribute('aria-modal', 'true');
+    card.setAttribute('aria-labelledby', 'sd-dialog-msg');
+    const msgEl = document.createElement('div');
+    msgEl.id = 'sd-dialog-msg';
+    const actions = document.createElement('div');
+    actions.id = 'sd-dialog-actions';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'act-btn';
+    const okBtn = document.createElement('button');
+    okBtn.type = 'button';
+    okBtn.className = 'act-btn';
+    actions.appendChild(cancelBtn);
+    actions.appendChild(okBtn);
+    card.appendChild(msgEl);
+    card.appendChild(actions);
+    dlg.appendChild(card);
+    document.body.appendChild(dlg);
+
+    const dlgQueue = [];
+    let dlgCurrent = null;   // { resolve, kind, returnFocus }
+
+    function dlgFinish(result) {
+      if (!dlgCurrent) return;
+      const cur = dlgCurrent;
+      dlgCurrent = null;
+      dlg.classList.remove('show');
+      if (cur.returnFocus && cur.returnFocus.isConnected && cur.returnFocus.focus) cur.returnFocus.focus();
+      cur.resolve(result);
+      dlgPump();
+    }
+    function dlgPump() {
+      if (dlgCurrent || !dlgQueue.length) return;
+      const job = dlgQueue.shift();
+      const o = job.opts || {};
+      closeOpen(false);
+      hideTip();
+      dlgCurrent = { resolve: job.resolve, kind: job.kind, returnFocus: document.activeElement };
+      msgEl.textContent = job.message;
+      okBtn.textContent = o.confirmText || (job.kind === 'notice' ? 'OK' : 'Confirm');
+      okBtn.classList.toggle('danger', !!o.danger);
+      cancelBtn.textContent = o.cancelText || 'Cancel';
+      cancelBtn.classList.toggle('hidden', job.kind === 'notice');
+      dlg.classList.add('show');
+      (job.kind === 'confirm' && o.danger ? cancelBtn : okBtn).focus();
+    }
+    function enqueue(kind, message, opts) {
+      return new Promise((resolve) => {
+        dlgQueue.push({ kind, message: String(message == null ? '' : message), opts, resolve });
+        dlgPump();
+      });
+    }
+    // overlayConfirm(msg, { confirmText, cancelText, danger }) -> Promise<boolean>
+    function overlayConfirm(message, opts) { return enqueue('confirm', message, opts); }
+    // overlayNotice(msg, { confirmText }) -> Promise<true>
+    function overlayNotice(message, opts) { return enqueue('notice', message, opts); }
+    window.overlayConfirm = overlayConfirm;
+    window.overlayNotice = overlayNotice;
+
+    okBtn.addEventListener('click', () => dlgFinish(true));
+    cancelBtn.addEventListener('click', () => dlgFinish(false));
+    dlg.addEventListener('mousedown', (e) => { if (e.target === dlg) { e.preventDefault(); dlgFinish(dlgCurrent && dlgCurrent.kind === 'notice'); } });
+    window.addEventListener('keydown', (e) => {
+      if (!dlgCurrent) return;
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation();
+        dlgFinish(dlgCurrent.kind === 'notice');
+        return;
+      }
+      if (e.key === 'Tab') {
+        const btns = dlgCurrent.kind === 'notice' ? [okBtn] : [cancelBtn, okBtn];
+        const i = btns.indexOf(document.activeElement);
+        e.preventDefault();
+        const next = e.shiftKey ? (i <= 0 ? btns.length - 1 : i - 1) : (i + 1) % btns.length;
+        btns[next].focus();
+      }
+    }, true);
+
+    // ── Wire up ────────────────────────────────────────────────────────────
+    convertTitles(document);
+    document.querySelectorAll('select').forEach(enhanceSelect);
+    // Nodes created later (Gallery, Interview cards, modals): convert titles and
+    // enhance any late <select>.
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        if (m.type === 'attributes') { convertTitle(m.target); continue; }
+        m.addedNodes.forEach((n) => {
+          if (n.nodeType !== 1) return;
+          convertTitles(n);
+          if (n.tagName === 'SELECT') enhanceSelect(n);
+          else if (n.querySelectorAll) n.querySelectorAll('select').forEach(enhanceSelect);
+        });
+      }
+    }).observe(document.documentElement, {
+      childList: true, subtree: true, attributes: true, attributeFilter: ['title'],
+    });
+  })();
+</script>
 <script>
   const api = window.electronAPI || {};
 
@@ -801,6 +1291,43 @@
     document.addEventListener('click', (e) => {
       if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); }
     }, true);
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Resize grip. Same message shape as the drag above: 'start' on press, one
+  // 'move' per animation frame (main reads the live cursor), 'end' on release.
+  // Pointer capture keeps the gesture alive when the cursor leaves the window.
+  // ══════════════════════════════════════════════════════════════════════
+  (function initWindowResize() {
+    const grip = document.getElementById('resize-grip');
+    if (!grip || !api.resizeStart || !api.resizeMove || !api.resizeEnd) return;   // bridge missing
+    let active = false;
+    let pointerId = null;
+    let frame = 0;
+
+    function endResize() {
+      if (!active) return;
+      active = false;
+      if (frame) { cancelAnimationFrame(frame); frame = 0; }
+      try { if (pointerId !== null && grip.hasPointerCapture(pointerId)) grip.releasePointerCapture(pointerId); } catch (_) {}
+      pointerId = null;
+      api.resizeEnd();
+    }
+
+    grip.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || active) return;
+      e.preventDefault();
+      active = true;
+      pointerId = e.pointerId;
+      try { grip.setPointerCapture(pointerId); } catch (_) {}
+      api.resizeStart();
+    });
+    grip.addEventListener('pointermove', () => {
+      if (!active) return;
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (active) api.resizeMove(); });
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((t) => grip.addEventListener(t, endResize));
+    window.addEventListener('blur', endResize);
   })();
 
   // ── Elements ────────────────────────────────────────────
@@ -892,7 +1419,7 @@
       stop.type = 'button';
       stop.className = 'act-btn';
       stop.textContent = 'Stop';
-      stop.title = 'Stop waiting for this request';
+      stop.setAttribute('data-tip', 'Stop waiting for this request');
       stop.setAttribute('aria-label', 'Stop');
       stop.addEventListener('click', (e) => { e.stopPropagation(); stop.disabled = true; onStop(); });
       wrap.appendChild(stop);
@@ -948,7 +1475,7 @@
   // Push initial tone to main.
   api.setTone && api.setTone(toneSelect.value);
 
-  // ── Ask flow (edit OCR text -> OpenAI answer) ───────────
+  // ── Ask flow (typed question -> OpenAI answer) ───────────
   let askBusy = false;
   async function askCurrentText() {
     if (askBusy) return;
@@ -1016,7 +1543,7 @@
     const titleEl = document.getElementById('compact-title');
     const restoreBtn = document.getElementById('compact-restore');
     const editModalEl = document.getElementById('edit-modal');
-    const settingsPop = document.getElementById('settings-pop');
+    // [OCR-DISABLED] const settingsPop = document.getElementById('settings-pop');
     const SF = window.SolutionFormat;
     let active = false;
     let reopenEditModal = false;
@@ -1057,7 +1584,7 @@
       if (active) return true;
       reopenEditModal = editModalEl.classList.contains('open');
       editModalEl.classList.remove('open');          // hide only; its state is kept
-      if (settingsPop) settingsPop.classList.add('hidden');
+      // [OCR-DISABLED] if (settingsPop) settingsPop.classList.add('hidden');
       overlayCard.classList.add('hidden');
       view.classList.remove('hidden');
       active = true;
@@ -1096,9 +1623,8 @@
     });
   })();
 
-  // On-screen capture buttons: same paths as the ⌘⇧1 / ⌘⇧2 hotkeys. In Local OCR
-  // mode the extracted text lands in the box above; in OpenAI-vision mode the
-  // send popup opens. The overlay is content-protected, so it is not captured.
+  // On-screen capture buttons: same paths as the ⌘⇧1 / ⌘⇧2 hotkeys; both open
+  // the vision send popup. The overlay is content-protected, so it is not captured.
   ['full', 'region'].forEach((kind) => {
     const btn = document.getElementById('btn-capture-' + kind);
     if (!btn) return;
@@ -1134,31 +1660,31 @@
   });
 
   // ── Capture lifecycle (from main via IPC) ───────────────
-  if (api.onSolveStatus) api.onSolveStatus((p) => {
-    if (p && p.status === 'ocr') {
-      if (window.closeSolutionPanel) window.closeSolutionPanel();   // back to the full overlay
-      showView('answer');
-      setStatus('Reading screen…', 'thinking');
-      ocrInput.value = '';
-      showLoader(answerBody, 'Reading screen…', () => { if (api.cancelOcr) api.cancelOcr(); });
-    } else if (p && p.status === 'cancelled') {
-      // Stop pressed: the capture stays saved in the Gallery. Not an error.
-      setStatus('Cancelled.', 'idle');
-      answerBody.innerHTML = '<span class="muted">Cancelled. The capture is saved in the Gallery.</span>';
-      loadGallery({ silent: true });
-    }
-  });
-  // OCR finished: fill the editable box; user reviews/edits, then Ask.
-  if (api.onOcrReady) api.onOcrReady((p) => {
-    activeRecordId = (p && p.recordId) || null;
-    renderHistory([]);
-    ocrInput.value = (p && p.text) || '';
-    setStatus(ocrInput.value ? 'Edit the text, then press Ask' : 'No text detected — type your question', ocrInput.value ? 'idle' : 'error');
-    answerBody.innerHTML = '<span class="muted">Review the extracted text above, then press ➤ Ask.</span>';
-    ocrInput.focus();
-    // The backend saved this capture before OCR; show it in the Gallery too.
-    loadGallery({ silent: true });
-  });
+  // [OCR-DISABLED] if (api.onSolveStatus) api.onSolveStatus((p) => {
+  // [OCR-DISABLED]   if (p && p.status === 'ocr') {
+  // [OCR-DISABLED]     if (window.closeSolutionPanel) window.closeSolutionPanel();   // back to the full overlay
+  // [OCR-DISABLED]     showView('answer');
+  // [OCR-DISABLED]     setStatus('Reading screen…', 'thinking');
+  // [OCR-DISABLED]     ocrInput.value = '';
+  // [OCR-DISABLED]     showLoader(answerBody, 'Reading screen…', () => { if (api.cancelOcr) api.cancelOcr(); });
+  // [OCR-DISABLED]   } else if (p && p.status === 'cancelled') {
+  // [OCR-DISABLED]     // Stop pressed: the capture stays saved in the Gallery. Not an error.
+  // [OCR-DISABLED]     setStatus('Cancelled.', 'idle');
+  // [OCR-DISABLED]     answerBody.innerHTML = '<span class="muted">Cancelled. The capture is saved in the Gallery.</span>';
+  // [OCR-DISABLED]     loadGallery({ silent: true });
+  // [OCR-DISABLED]   }
+  // [OCR-DISABLED] });
+  // [OCR-DISABLED] // OCR finished: fill the editable box; user reviews/edits, then Ask.
+  // [OCR-DISABLED] if (api.onOcrReady) api.onOcrReady((p) => {
+  // [OCR-DISABLED]   activeRecordId = (p && p.recordId) || null;
+  // [OCR-DISABLED]   renderHistory([]);
+  // [OCR-DISABLED]   ocrInput.value = (p && p.text) || '';
+  // [OCR-DISABLED]   setStatus(ocrInput.value ? 'Edit the text, then press Ask' : 'No text detected — type your question', ocrInput.value ? 'idle' : 'error');
+  // [OCR-DISABLED]   answerBody.innerHTML = '<span class="muted">Review the extracted text above, then press ➤ Ask.</span>';
+  // [OCR-DISABLED]   ocrInput.focus();
+  // [OCR-DISABLED]   // The backend saved this capture before OCR; show it in the Gallery too.
+  // [OCR-DISABLED]   loadGallery({ silent: true });
+  // [OCR-DISABLED] });
   if (api.onSolveError) api.onSolveError((p) => {
     setStatus('Error', 'error');
     answerBody.textContent = (p && p.error) || 'Something went wrong.';
@@ -1169,7 +1695,7 @@
   document.getElementById('gallery-refresh').addEventListener('click', () => loadGallery());
   document.getElementById('gallery-clear').addEventListener('click', async () => {
     if (!api.clearRecords) return;
-    if (!confirm('Clear all history? (Records removed; images on disk kept.)')) return;
+    if (!(await overlayConfirm('Clear all history? (Records removed; images on disk kept.)', { confirmText: 'Clear all', danger: true }))) return;
     await api.clearRecords();
     loadGallery();
   });
@@ -1251,8 +1777,8 @@
         html += `<div class="g-item" data-id="${r.id}" data-type="${r.source_type}">${thumb}
           <span class="g-badge" style="color:${color}">${badge}</span>
           <div class="g-actions">
-            <span class="g-act edit" data-id="${r.id}" data-type="${r.source_type}" title="Edit">✏️</span>
-            <span class="g-act del" data-id="${r.id}" title="Delete">×</span>
+            <span class="g-act edit" data-id="${r.id}" data-type="${r.source_type}" data-tip="Edit" aria-label="Edit">✏️</span>
+            <span class="g-act del" data-id="${r.id}" data-tip="Delete" aria-label="Delete">×</span>
           </div></div>`;
       }
       html += '</div>';
@@ -1271,7 +1797,7 @@
     galleryGrid.querySelectorAll('.g-act.del').forEach((el) => {
       el.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm('Delete this capture?')) return;
+        if (!(await overlayConfirm('Delete this capture?', { confirmText: 'Delete', danger: true }))) return;
         await api.deleteRecord(el.getAttribute('data-id'));
         loadGallery();
       });
@@ -1361,7 +1887,9 @@
       return;
     }
 
-    ocrInput.value = rec.record.extracted_text || '';
+    // [OCR-DISABLED] ocrInput.value = rec.record.extracted_text || '';
+    // Image records: extracted_text is only a vision label / old OCR text; never put it in the question box.
+    ocrInput.value = isImageSourceType(rec.record.source_type) ? '' : (rec.record.extracted_text || '');
     renderHistory(rec.history);
 
     // Cache hit: answered -> show the LATEST stored answer instantly (no OpenAI).
@@ -1372,12 +1900,15 @@
     }
 
     // Not answered yet -> let the user review the text and press Ask.
-    setStatus('Edit the text, then press Ask', 'idle');
-    answerBody.innerHTML = '<span class="muted">Review the extracted text above, then press ➤ Ask.</span>';
+    setStatus('Edit the question, then press Ask', 'idle');
+    answerBody.innerHTML = '<span class="muted">Edit the question above, then press ➤ Ask.</span>';
+  }
+  function isImageSourceType(st) {
+    return typeof st === 'string' && st.indexOf('screenshot') === 0;
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // Gallery edit modal — image editor (draw/crop) + OCR + answer, or a text
+  // Gallery edit modal — image editor (draw/crop) + vision button + answer, or a text
   // editor (+ answer) for manual/audio records. Lives inside this content-
   // protected overlay window, so it stays hidden from screen sharing.
   // ══════════════════════════════════════════════════════════════════════
@@ -1385,7 +1916,7 @@
     const modal = document.getElementById('edit-modal');
     const card = document.getElementById('edit-card');
     const titleEl = document.getElementById('edit-title');
-    const verBadge = document.getElementById('edit-ver-badge');
+    // [OCR-DISABLED] const verBadge = document.getElementById('edit-ver-badge');
     const imageTools = document.getElementById('edit-image-tools');
     const textLabel = document.getElementById('edit-text-label');
     const textArea = document.getElementById('edit-text');
@@ -1396,7 +1927,7 @@
     const btnCrop = document.getElementById('edit-mode-crop');
     const btnApplyCrop = document.getElementById('edit-apply-crop');
     const btnReset = document.getElementById('edit-reset');
-    const btnOcr = document.getElementById('edit-ocr');
+    // [OCR-DISABLED] const btnOcr = document.getElementById('edit-ocr');
     const btnGetAnswer = document.getElementById('edit-get-answer');
     const canvas = document.getElementById('edit-canvas');
 
@@ -1408,11 +1939,10 @@
     let cropStart = { x: 0, y: 0 };
     let cropEnd = { x: 0, y: 0 };
     let savedCanvasState = null;
-    // The record the modal is currently acting on. After OCR this becomes the
-    // NEW record returned by /api/ocr-only (the new version).
+    // The record the modal is currently acting on.
     let editRecordId = null;
     let editSourceType = null;         // original record's source_type
-    let sourceExtractedText = '';      // original text (for version labelling)
+    let sourceExtractedText = '';      // original text (text/voice records)
 
     function setStatus(msg) { statusEl.textContent = msg || ''; }
     // Loader (+ Stop) in the status line; the next setStatus() replaces it.
@@ -1420,9 +1950,10 @@
       statusEl.textContent = '';
       statusEl.appendChild(createLoader(label, onStop));
     }
-    // Only one long operation at a time: toggle all three action buttons.
+    // Only one long operation at a time: toggle the action buttons.
     function setBusy(on) {
-      [btnOcr, btnGetAnswer, btnVision].forEach((b) => { if (b) b.disabled = !!on; });
+      // [OCR-DISABLED] [btnOcr, btnGetAnswer, btnVision].forEach((b) => { if (b) b.disabled = !!on; });
+      [btnGetAnswer, btnVision].forEach((b) => { if (b) b.disabled = !!on; });
     }
     function restoreNodes(el, nodes) {
       el.textContent = '';
@@ -1512,7 +2043,7 @@
       canvas.height = h;
       ctx.putImageData(croppedData, 0, 0);
       setMode('draw');
-      setStatus('Cropped. Run OCR to save this as a new version.');
+      setStatus('Cropped. Press Get solution from image to send it.');
     }
 
     btnDraw.addEventListener('click', () => setMode('draw'));
@@ -1520,64 +2051,63 @@
     btnApplyCrop.addEventListener('click', applyCrop);
     btnReset.addEventListener('click', () => { resetEditor(); setStatus('Reset to original image.'); });
 
-    // Best-effort version label: count existing records whose extracted_text
-    // starts with the same prefix as this source, then append V1/V2/… The new
-    // OCR record IS the new version (a distinct Gallery entry); this only adds
-    // a visible marker in the modal title.
-    async function deriveVersionLabel() {
-      const base = (sourceExtractedText || '').trim().slice(0, 40);
-      if (!base || !api.listRecords) return '';
-      try {
-        const data = await api.listRecords();
-        const recs = (data && data.records) || [];
-        let count = 0;
-        for (const r of recs) {
-          const t = (r.extracted_text || '').trim().slice(0, 40);
-          if (t && t === base) count += 1;
-        }
-        // `count` includes the source + any prior edits; the next version #
-        // is the number of existing matches (source counts as V0's base).
-        return 'V' + Math.max(1, count);
-      } catch (_) { return ''; }
-    }
-
-    // ── Perform OCR on the CURRENT canvas state -> new record ─────────────
-    btnOcr.addEventListener('click', async () => {
-      if (!api.ocrImage) { setStatus('OCR bridge unavailable.'); return; }
-      if (!canvas.width || !canvas.height) { setStatus('No image to OCR.'); return; }
-      const rid = genRequestId('ocr');
-      showBusy('Running OCR…', () => stopRequest(rid));
-      setBusy(true);
-      try {
-        const dataUrl = canvas.toDataURL('image/png');
-        const data = await api.ocrImage(dataUrl, 'screenshot-region', rid);
-        if (isCancelledResult(data)) {
-          // Stop pressed: canvas, text and current record stay untouched.
-          setStatus('Cancelled.');
-        } else if (data && data.success) {
-          // The new record IS the new version.
-          editRecordId = data.record_id;
-          editSourceType = 'screenshot-region';
-          textArea.value = data.extracted_text || '';
-          const label = await deriveVersionLabel();
-          if (label) { verBadge.textContent = label; verBadge.classList.remove('hidden'); }
-          setStatus('OCR complete — saved as a new version. Edit the text, then Get Answer.');
-          // Refresh the grid in the background so the new entry appears.
-          loadGallery({ silent: true });
-        } else {
-          setStatus('OCR failed: ' + ((data && data.error) || 'unknown error'));
-        }
-      } catch (err) {
-        setStatus('OCR request failed: ' + (err && err.message ? err.message : String(err)));
-      } finally {
-        setBusy(false);
-      }
-    });
-
-    // ── Get Answer (image or text records) ────────────────────────────────
+    // [OCR-DISABLED] // Best-effort version label: count existing records whose extracted_text
+    // [OCR-DISABLED] // starts with the same prefix as this source, then append V1/V2/… The new
+    // [OCR-DISABLED] // OCR record IS the new version (a distinct Gallery entry); this only adds
+    // [OCR-DISABLED] // a visible marker in the modal title.
+    // [OCR-DISABLED] async function deriveVersionLabel() {
+    // [OCR-DISABLED]   const base = (sourceExtractedText || '').trim().slice(0, 40);
+    // [OCR-DISABLED]   if (!base || !api.listRecords) return '';
+    // [OCR-DISABLED]   try {
+    // [OCR-DISABLED]     const data = await api.listRecords();
+    // [OCR-DISABLED]     const recs = (data && data.records) || [];
+    // [OCR-DISABLED]     let count = 0;
+    // [OCR-DISABLED]     for (const r of recs) {
+    // [OCR-DISABLED]       const t = (r.extracted_text || '').trim().slice(0, 40);
+    // [OCR-DISABLED]       if (t && t === base) count += 1;
+    // [OCR-DISABLED]     }
+    // [OCR-DISABLED]     // `count` includes the source + any prior edits; the next version #
+    // [OCR-DISABLED]     // is the number of existing matches (source counts as V0's base).
+    // [OCR-DISABLED]     return 'V' + Math.max(1, count);
+    // [OCR-DISABLED]   } catch (_) { return ''; }
+    // [OCR-DISABLED] }
+    // [OCR-DISABLED] 
+    // [OCR-DISABLED] // ── Perform OCR on the CURRENT canvas state -> new record ─────────────
+    // [OCR-DISABLED] btnOcr.addEventListener('click', async () => {
+    // [OCR-DISABLED]   if (!api.ocrImage) { setStatus('OCR bridge unavailable.'); return; }
+    // [OCR-DISABLED]   if (!canvas.width || !canvas.height) { setStatus('No image to OCR.'); return; }
+    // [OCR-DISABLED]   const rid = genRequestId('ocr');
+    // [OCR-DISABLED]   showBusy('Running OCR…', () => stopRequest(rid));
+    // [OCR-DISABLED]   setBusy(true);
+    // [OCR-DISABLED]   try {
+    // [OCR-DISABLED]     const dataUrl = canvas.toDataURL('image/png');
+    // [OCR-DISABLED]     const data = await api.ocrImage(dataUrl, 'screenshot-region', rid);
+    // [OCR-DISABLED]     if (isCancelledResult(data)) {
+    // [OCR-DISABLED]       // Stop pressed: canvas, text and current record stay untouched.
+    // [OCR-DISABLED]       setStatus('Cancelled.');
+    // [OCR-DISABLED]     } else if (data && data.success) {
+    // [OCR-DISABLED]       // The new record IS the new version.
+    // [OCR-DISABLED]       editRecordId = data.record_id;
+    // [OCR-DISABLED]       editSourceType = 'screenshot-region';
+    // [OCR-DISABLED]       textArea.value = data.extracted_text || '';
+    // [OCR-DISABLED]       const label = await deriveVersionLabel();
+    // [OCR-DISABLED]       if (label) { verBadge.textContent = label; verBadge.classList.remove('hidden'); }
+    // [OCR-DISABLED]       setStatus('OCR complete — saved as a new version. Edit the text, then Get Answer.');
+    // [OCR-DISABLED]       // Refresh the grid in the background so the new entry appears.
+    // [OCR-DISABLED]       loadGallery({ silent: true });
+    // [OCR-DISABLED]     } else {
+    // [OCR-DISABLED]       setStatus('OCR failed: ' + ((data && data.error) || 'unknown error'));
+    // [OCR-DISABLED]     }
+    // [OCR-DISABLED]   } catch (err) {
+    // [OCR-DISABLED]     setStatus('OCR request failed: ' + (err && err.message ? err.message : String(err)));
+    // [OCR-DISABLED]   } finally {
+    // [OCR-DISABLED]     setBusy(false);
+    // [OCR-DISABLED]   }
+    // [OCR-DISABLED] });
+    // ── Get Answer (text/voice records only) ────────────────────────────────
     btnGetAnswer.addEventListener('click', async () => {
       const text = (textArea.value || '').trim();
-      if (!text) { setStatus('Enter or OCR some text first.'); return; }
+      if (!text) { setStatus('Enter some text first.'); return; }
       if (!api.askText) { setStatus('Ask bridge unavailable.'); return; }
       const rid = genRequestId('ask');
       const prevAnswer = Array.from(answerEl.childNodes);
@@ -1663,9 +2193,15 @@
       editRecordId = id;
       editSourceType = sourceType;
       sourceExtractedText = '';
-      verBadge.classList.add('hidden');
-      verBadge.textContent = '';
-      answerEl.innerHTML = '<span class="muted">The answer will appear here after you press Get Answer.</span>';
+      // [OCR-DISABLED] verBadge.classList.add('hidden');
+      // [OCR-DISABLED] verBadge.textContent = '';
+      // Reset the text section (hidden below for image records).
+      textLabel.style.display = '';
+      textArea.style.display = '';
+      btnGetAnswer.style.display = '';
+      answerEl.innerHTML = isImageType(sourceType)
+        ? '<span class="muted">The answer will appear here after you press Get solution from image.</span>'
+        : '<span class="muted">The answer will appear here after you press Get Answer.</span>';
       textArea.value = '';
       setStatus('Loading…');
       modal.classList.add('open');
@@ -1676,7 +2212,8 @@
           const rr = await api.getRecord(id);
           if (rr && rr.success && rr.record) {
             sourceExtractedText = rr.record.extracted_text || '';
-            textArea.value = sourceExtractedText;
+            // Image records: extracted_text is only a vision label / old OCR text, not a question.
+            if (!isImageType(sourceType)) textArea.value = sourceExtractedText;
             if (rr.record.answer) answerEl.textContent = rr.record.answer;
           }
         } catch (_) { /* non-fatal; user can still edit */ }
@@ -1686,11 +2223,15 @@
         // Image editor flow.
         titleEl.textContent = 'Edit image';
         imageTools.classList.remove('hidden');
-        textLabel.textContent = 'Extracted text (run OCR, then Get Answer)';
+        // [OCR-DISABLED] textLabel.textContent = 'Extracted text (run OCR, then Get Answer)';
+        // Image records use only the vision button: hide the text box + Get Answer.
+        textLabel.style.display = 'none';
+        textArea.style.display = 'none';
+        btnGetAnswer.style.display = 'none';
         ctx = canvas.getContext('2d');
         originalImage = new Image();
         originalImage.crossOrigin = 'anonymous';
-        originalImage.onload = () => { resetEditor(); setStatus('Draw or crop, then Perform OCR.'); };
+        originalImage.onload = () => { resetEditor(); setStatus('Draw or crop, then press Get solution from image.'); };
         originalImage.onerror = () => { setStatus('Could not load the image for this record.'); };
         originalImage.src = `${api.backendUrl}/api/records/${id}/image`;
       } else {
@@ -1902,10 +2443,10 @@
     suggestionsBox.innerHTML = '';
     list.forEach((s, i) => {
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex; gap:8px; align-items:flex-start; cursor:pointer; padding:6px; border-radius:7px;';
+      row.style.cssText = 'display:flex; gap:8px; align-items:flex-start; padding:6px; border-radius:7px;';
       row.onmouseenter = () => { row.style.background = 'rgba(255,255,255,0.07)'; };
       row.onmouseleave = () => { row.style.background = 'transparent'; };
-      row.title = 'Click to copy';
+      row.setAttribute('data-tip', 'Click to copy');
       row.onclick = () => { navigator.clipboard.writeText(s); };
       row.innerHTML = `<span style="color:#4c9aff; font-weight:700;">${i + 1}.</span>
         <span style="font-size:14px; line-height:1.45; color:#f2f2f4;">${s.replace(/[<>&]/g, (c)=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c]))}</span>`;
@@ -2016,6 +2557,11 @@
       cvBtn: document.getElementById('iv-cv-btn'),
       cvLabel: document.getElementById('iv-cv-label'),
       cvClear: document.getElementById('iv-cv-clear'),
+      cvPasteBtn: document.getElementById('iv-cv-paste-btn'),
+      cvPaste: document.getElementById('iv-cv-paste'),
+      cvText: document.getElementById('iv-cv-text'),
+      cvPasteSubmit: document.getElementById('iv-cv-paste-submit'),
+      cvPasteCancel: document.getElementById('iv-cv-paste-cancel'),
     };
 
     let healthLoaded = false;
@@ -2385,30 +2931,53 @@
     function noteResumeApplies() {
       if (IV.isRunning()) showError('Resume will apply when you (re)start listening.');
     }
+    // Shared by the file route and the "Paste text instead" route (same parse call,
+    // same loading / success / error handling). Resolves true when a profile loaded.
+    async function loadResumeFile(file) {
+      if (!api.parseResume) { showError('Resume upload is unavailable.'); return false; }
+      el.cvLabel.textContent = 'Parsing…';
+      try {
+        const res = await api.parseResume(file);
+        if (res && res.success) {
+          IV.setCandidateProfile(res.profile || '');
+          let label = 'Resume loaded (' + (res.chars || 0) + ' chars)';
+          if (res.truncated) label += ' (truncated)';
+          el.cvLabel.textContent = label;
+          noteResumeApplies();
+          return true;
+        }
+        el.cvLabel.textContent = 'No resume';
+        showError((res && res.error) || 'Could not parse resume.');
+      } catch (_) {
+        el.cvLabel.textContent = 'No resume';
+        showError('Backend unreachable — could not parse resume.');
+      }
+      return false;
+    }
     if (el.cvBtn && el.cvInput) {
       el.cvBtn.addEventListener('click', () => el.cvInput.click());
       el.cvInput.addEventListener('change', async () => {
         const file = el.cvInput.files && el.cvInput.files[0];
         if (!file) return;
-        if (!api.parseResume) { showError('Resume upload is unavailable.'); return; }
-        el.cvLabel.textContent = 'Parsing…';
         try {
-          const res = await api.parseResume(file);
-          if (res && res.success) {
-            IV.setCandidateProfile(res.profile || '');
-            let label = 'Resume loaded (' + (res.chars || 0) + ' chars)';
-            if (res.truncated) label += ' (truncated)';
-            el.cvLabel.textContent = label;
-            noteResumeApplies();
-          } else {
-            el.cvLabel.textContent = 'No resume';
-            showError((res && res.error) || 'Could not parse resume.');
-          }
-        } catch (_) {
-          el.cvLabel.textContent = 'No resume';
-          showError('Backend unreachable — could not parse resume.');
+          await loadResumeFile(file);
         } finally {
           el.cvInput.value = '';   // allow re-selecting the same file
+        }
+      });
+    }
+    if (el.cvPasteBtn && el.cvPaste && el.cvText) {
+      el.cvPasteBtn.addEventListener('click', () => {
+        const opening = el.cvPaste.classList.toggle('hidden') === false;
+        if (opening) el.cvText.focus();
+      });
+      el.cvPasteCancel.addEventListener('click', () => el.cvPaste.classList.add('hidden'));
+      el.cvPasteSubmit.addEventListener('click', async () => {
+        const text = el.cvText.value.trim();
+        if (!text) { showError('Paste some resume text first.'); return; }
+        if (await loadResumeFile(new File([text], 'resume.txt', { type: 'text/plain' }))) {
+          el.cvText.value = '';
+          el.cvPaste.classList.add('hidden');
         }
       });
     }
@@ -2454,45 +3023,44 @@
   }
   checkBackend();
 
-  // ── Direct-to-OpenAI vision capture (settings + send popup) ───────────
+  // ── Direct-to-OpenAI vision capture (send popup) ───────────
   (function initVisionCapture() {
     const VB = window.VisionBatch;
     if (!VB) { console.warn('[vision] vision-batch.js not loaded'); return; }
     const $ = (id) => document.getElementById(id);
     const popup = $('vision-popup'), strip = $('vp-strip'), countEl = $('vp-count'), msgEl = $('vp-msg');
     const addBtn = $('vp-add'), sendBtn = $('vp-send'), cancelBtn = $('vp-cancel');
-    const settingsBtn = $('btn-settings'), settingsPop = $('settings-pop');
-    const cmRadios = document.querySelectorAll('input[name="capture-mode"]');
+    // [OCR-DISABLED] const settingsBtn = $('btn-settings'), settingsPop = $('settings-pop');
+    // [OCR-DISABLED] const cmRadios = document.querySelectorAll('input[name="capture-mode"]');
     const vmRadios = document.querySelectorAll('input[name="vision-mode"]');
 
-    // Capture mode (persisted; mirrored to main like the tone setting).
-    let stored = null;
-    try { stored = localStorage.getItem('captureMode'); } catch (_) {}
-    let captureMode = VB.normalizeCaptureMode(stored);
-    cmRadios.forEach((r) => { r.checked = (r.value === captureMode); });
-    cmRadios.forEach((r) => r.addEventListener('change', () => {
-      if (!r.checked) return;
-      captureMode = VB.normalizeCaptureMode(r.value);
-      try { localStorage.setItem('captureMode', captureMode); } catch (_) {}
-      api.setCaptureMode && api.setCaptureMode(captureMode);
-    }));
-    api.setCaptureMode && api.setCaptureMode(captureMode);
-
-    // Settings popover.
-    function setSettingsOpen(open) {
-      settingsPop.classList.toggle('hidden', !open);
-      settingsBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-    settingsBtn.addEventListener('click', () => setSettingsOpen(settingsPop.classList.contains('hidden')));
-    document.addEventListener('mousedown', (e) => {
-      if (settingsPop.classList.contains('hidden')) return;
-      if (settingsPop.contains(e.target) || settingsBtn.contains(e.target)) return;
-      setSettingsOpen(false);
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !settingsPop.classList.contains('hidden')) setSettingsOpen(false);
-    });
-
+    // [OCR-DISABLED] // Capture mode (persisted; mirrored to main like the tone setting).
+    // [OCR-DISABLED] let stored = null;
+    // [OCR-DISABLED] try { stored = localStorage.getItem('captureMode'); } catch (_) {}
+    // [OCR-DISABLED] let captureMode = VB.normalizeCaptureMode(stored);
+    // [OCR-DISABLED] cmRadios.forEach((r) => { r.checked = (r.value === captureMode); });
+    // [OCR-DISABLED] cmRadios.forEach((r) => r.addEventListener('change', () => {
+    // [OCR-DISABLED]   if (!r.checked) return;
+    // [OCR-DISABLED]   captureMode = VB.normalizeCaptureMode(r.value);
+    // [OCR-DISABLED]   try { localStorage.setItem('captureMode', captureMode); } catch (_) {}
+    // [OCR-DISABLED]   api.setCaptureMode && api.setCaptureMode(captureMode);
+    // [OCR-DISABLED] }));
+    // [OCR-DISABLED] api.setCaptureMode && api.setCaptureMode(captureMode);
+    // [OCR-DISABLED] 
+    // [OCR-DISABLED] // Settings popover.
+    // [OCR-DISABLED] function setSettingsOpen(open) {
+    // [OCR-DISABLED]   settingsPop.classList.toggle('hidden', !open);
+    // [OCR-DISABLED]   settingsBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    // [OCR-DISABLED] }
+    // [OCR-DISABLED] settingsBtn.addEventListener('click', () => setSettingsOpen(settingsPop.classList.contains('hidden')));
+    // [OCR-DISABLED] document.addEventListener('mousedown', (e) => {
+    // [OCR-DISABLED]   if (settingsPop.classList.contains('hidden')) return;
+    // [OCR-DISABLED]   if (settingsPop.contains(e.target) || settingsBtn.contains(e.target)) return;
+    // [OCR-DISABLED]   setSettingsOpen(false);
+    // [OCR-DISABLED] });
+    // [OCR-DISABLED] document.addEventListener('keydown', (e) => {
+    // [OCR-DISABLED]   if (e.key === 'Escape' && !settingsPop.classList.contains('hidden')) setSettingsOpen(false);
+    // [OCR-DISABLED] });
     let batch = VB.createBatch();
     let sending = false;
     const isOpen = () => !popup.classList.contains('hidden');
@@ -2530,7 +3098,8 @@
       sendBtn.textContent = sending ? 'Sending…' : 'Send';
       const full = VB.isFull(batch);
       addBtn.disabled = full || sending;
-      addBtn.title = full ? 'Batch limit reached (' + VB.MAX_BATCH + ' images)' : '';
+      if (full) addBtn.setAttribute('data-tip', 'Batch limit reached (' + VB.MAX_BATCH + ' images)');
+      else addBtn.removeAttribute('data-tip');
       cancelBtn.disabled = sending;
     }
 
