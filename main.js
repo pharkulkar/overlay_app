@@ -619,7 +619,7 @@ app.whenReady().then(() => {
       sendToOverlay('capture-error', {
         error: 'Hotkey not available: ' + hotkeyFailures.join(', ')
           + '. Another app already uses it; set a different key with the matching HOTKEY_* variable '
-          + '(capture can still be used from the buttons in the Answer tab).',
+          + '(capture can still be used from the buttons in the Interview tab).',
       });
     });
   }

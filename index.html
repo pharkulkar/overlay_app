@@ -569,8 +569,8 @@
     <span class="title">Assistant</span>
     <div class="nav" role="tablist" aria-label="Sections">
       <button class="nav-btn active" id="nav-interview" role="tab" aria-selected="true" aria-controls="view-interview" tabindex="0">Interview</button>
-      <button class="nav-btn" id="nav-answer" role="tab" aria-selected="false" aria-controls="view-answer" tabindex="-1">Answer</button>
       <button class="nav-btn" id="nav-gallery" role="tab" aria-selected="false" aria-controls="view-gallery" tabindex="-1">Gallery</button>
+      <button class="nav-btn" id="nav-answer" role="tab" aria-selected="false" aria-controls="view-answer" tabindex="-1">Ask</button>
       <!-- [AUDIO-TAB-DISABLED] <button class="nav-btn" id="nav-audio" role="tab" aria-selected="false" aria-controls="view-audio" tabindex="-1">Audio</button> -->
     </div>
     <span class="spacer"></span>
@@ -693,7 +693,7 @@
 
     <div class="iv-meta interactive" style="font-size:11px;">
       Listens to the interviewer via system audio (what plays through your speakers), not your microphone.
-      For a manual question, use the <b>Answer</b> tab.
+      For a manual question, use the <b>Ask</b> tab.
     </div>
   </div>
 
@@ -1493,8 +1493,8 @@
   };
   const navs = {
     interview: document.getElementById('nav-interview'),
-    answer: document.getElementById('nav-answer'),
     gallery: document.getElementById('nav-gallery'),
+    answer: document.getElementById('nav-answer'),
     // [AUDIO-TAB-DISABLED] audio: document.getElementById('nav-audio'),
   };
 
@@ -1880,7 +1880,7 @@
     lastNewestSig = window.UxHelpers ? window.UxHelpers.newestSignature(records) : null;
     const prevScroll = silent ? galleryGrid.scrollTop : 0;
     if (!records.length) {
-      galleryGrid.innerHTML = '<div class="muted">No captures yet. Use the Capture buttons in the Answer tab (or '
+      galleryGrid.innerHTML = '<div class="muted">No captures yet. Use the Capture buttons in the Interview tab (or '
         + hotkeyText('capture') + ' / ' + hotkeyText('region') + ').</div>';
       return;
     }
