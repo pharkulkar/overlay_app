@@ -503,6 +503,16 @@ test('every inline <script> in index.html and selection.html compiles', () => {
   });
 });
 
+test('settings sheet exists once and holds the language, roman, resume and opacity controls', () => {
+  const m = splitHtml(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')).markup;
+  assert.strictEqual((m.match(/id="settings-sheet"/g) || []).length, 1);
+  assert.strictEqual((m.match(/id="settings-btn"/g) || []).length, 1);
+  const sheet = m.slice(m.indexOf('id="settings-sheet"'), m.indexOf('id="view-answer"'));
+  ['iv-langs', 'iv-roman', 'iv-cv-btn', 'iv-cv-clear', 'iv-cv-paste', 'op-glass', 'op-solid'].forEach((id) => {
+    assert.ok(sheet.includes('id="' + id + '"'), id + ' lives inside the settings sheet');
+  });
+  assert.ok(!/id="iv-setup"/.test(m), 'old Setup row is gone');
+});
 test('every id referenced by active JS exists exactly once in the markup', () => {
   const problems = [];
   [['index.html'], ['selection.html']].forEach(([f]) => {

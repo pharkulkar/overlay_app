@@ -62,7 +62,7 @@
   }
   .nav-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
   .nav-btn.active { background: rgba(76,154,255,0.9); color: #fff; }
-  .nav-btn:focus-visible, .seg-btn:focus-visible, .iv-setup > summary:focus-visible {
+  .nav-btn:focus-visible, .seg-btn:focus-visible, .icon-btn:focus-visible {
     outline: 2px solid rgba(76,154,255,0.9); outline-offset: 1px;
   }
   .seg { display: flex; flex: none; }
@@ -220,10 +220,15 @@
   .iv-pill[data-state="ANSWER READY"] .live-dot { background: #4cd964; }
   @keyframes ivpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
+  #settings-sheet {
+    flex: 1; min-height: 0;
+    overflow-y: auto; box-sizing: border-box; padding: 10px; border-radius: 10px;
+    background: #1d1f24; border: 1px solid rgba(255,255,255,0.14);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #settings-sheet:not(.hidden) ~ .view { display: none !important; }
+  .settings-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   /* Multi-select language dropdown (native <details> disclosure popover). */
-  .iv-setup > summary { list-style: none; user-select: none; }
-  .iv-setup > summary::-webkit-details-marker { display: none; }
-  .iv-setup-body { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 8px; }
   .iv-langs { position: relative; display: inline-block; }
   .iv-langs > summary { list-style: none; user-select: none; }
   .iv-langs > summary::-webkit-details-marker { display: none; }
@@ -574,11 +579,7 @@
       <!-- [AUDIO-TAB-DISABLED] <button class="nav-btn" id="nav-audio" role="tab" aria-selected="false" aria-controls="view-audio" tabindex="-1">Audio</button> -->
     </div>
     <span class="spacer"></span>
-    <div class="seg" role="group" aria-label="Overlay opacity">
-      <button type="button" class="seg-btn" id="op-glass" data-op="glass" aria-pressed="true" data-tip="Glass: see-through">Glass</button>
-      <button type="button" class="seg-btn" id="op-dim" data-op="dim" aria-pressed="false" data-tip="Dim: darker background">Dim</button>
-      <button type="button" class="seg-btn" id="op-solid" data-op="solid" aria-pressed="false" data-tip="Solid: opaque background">Solid</button>
-    </div>
+    <button class="icon-btn" id="settings-btn" data-tip="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settings-sheet">⚙︎</button>
     <!-- [OCR-DISABLED] capture-mode settings gear (only one mode remains)
     <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">⚙︎</button>
     -->
@@ -600,6 +601,46 @@
     </ul>
     <div style="margin-top:8px; text-align:right;">
       <button class="act-btn" id="consent-ok">Got it</button>
+    </div>
+  </div>
+
+  <!-- Settings sheet: language, resume and opacity controls in one place. -->
+  <div id="settings-sheet" class="interactive hidden" role="dialog" aria-label="Settings">
+    <div class="actions">
+      <span class="zone-label">Settings</span>
+      <span class="spacer"></span>
+      <button class="act-btn" id="settings-close" type="button">Close</button>
+    </div>
+    <div class="zone-label">Language</div>
+    <div class="settings-group">
+    <details id="iv-langs" class="iv-langs" data-tip="Select the languages the interviewer may speak">
+      <summary class="act-btn" id="iv-lang-summary">Languages: EN</summary>
+      <div class="iv-langs-list" id="iv-langs-list"></div>
+    </details>
+    <label class="iv-roman" data-tip="Transcripts and answers use English letters for every language"><input type="checkbox" id="iv-roman" checked><span>Show everything in English letters</span></label>
+    </div>
+    <div class="zone-label">Resume</div>
+    <div class="settings-group">
+    <!-- Resume (CV) document controls. -->
+    <input type="file" id="iv-cv-input" accept=".pdf,.docx,.txt" style="display:none;">
+    <button class="act-btn" id="iv-cv-btn" data-tip="Upload a resume to set the interview context" aria-label="Upload Resume">📄 <span class="lbl">Upload Resume</span></button>
+    <button class="act-btn" id="iv-cv-paste-btn" type="button" data-tip="Paste your resume as text instead of choosing a file">Paste text instead</button>
+    <span class="iv-meta" id="iv-cv-label">No resume</span>
+    <button class="act-btn" id="iv-cv-clear" data-tip="Clear the loaded resume" aria-label="Clear the loaded resume">✕</button>
+    <div class="iv-meta" id="iv-cv-hint" style="font-size:11px; flex-basis:100%;">Tip: choose the file before you start sharing your screen - the system file picker can be visible to others.</div>
+    <div id="iv-cv-paste" class="interactive hidden" style="display:flex; flex-direction:column; gap:6px; flex-basis:100%;">
+      <textarea id="iv-cv-text" rows="6" placeholder="Paste your resume text here" aria-label="Resume text"></textarea>
+      <div class="actions">
+        <button class="act-btn" id="iv-cv-paste-submit" type="button">Use this text</button>
+        <button class="act-btn" id="iv-cv-paste-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+    </div>
+    <div class="zone-label">Appearance</div>
+    <div class="seg" role="group" aria-label="Overlay opacity">
+      <button type="button" class="seg-btn" id="op-glass" data-op="glass" aria-pressed="true" data-tip="Glass: see-through">Glass</button>
+      <button type="button" class="seg-btn" id="op-dim" data-op="dim" aria-pressed="false" data-tip="Dim: darker background">Dim</button>
+      <button type="button" class="seg-btn" id="op-solid" data-op="solid" aria-pressed="false" data-tip="Solid: opaque background">Solid</button>
     </div>
   </div>
 
@@ -645,30 +686,6 @@
       <span class="spacer"></span>
       <button class="act-btn" id="iv-clear" data-tip="Clear the transcript and all Q&amp;A cards" aria-label="Clear">🗑 <span class="lbl">Clear</span></button>
     </div>
-    <details id="iv-setup" class="iv-setup interactive">
-      <summary class="act-btn">Setup</summary>
-      <div class="iv-setup-body">
-        <details id="iv-langs" class="iv-langs" data-tip="Select the languages the interviewer may speak">
-          <summary class="act-btn" id="iv-lang-summary">Languages: EN</summary>
-          <div class="iv-langs-list" id="iv-langs-list"></div>
-        </details>
-        <label class="iv-roman" data-tip="Transcripts and answers use English letters for every language"><input type="checkbox" id="iv-roman" checked><span>Show everything in English letters</span></label>
-        <!-- Resume (CV) document controls. -->
-        <input type="file" id="iv-cv-input" accept=".pdf,.docx,.txt" style="display:none;">
-        <button class="act-btn" id="iv-cv-btn" data-tip="Upload a resume to set the interview context" aria-label="Upload Resume">📄 <span class="lbl">Upload Resume</span></button>
-        <button class="act-btn" id="iv-cv-paste-btn" type="button" data-tip="Paste your resume as text instead of choosing a file">Paste text instead</button>
-        <span class="iv-meta" id="iv-cv-label">No resume</span>
-        <button class="act-btn" id="iv-cv-clear" data-tip="Clear the loaded resume" aria-label="Clear the loaded resume">✕</button>
-        <div class="iv-meta" id="iv-cv-hint" style="font-size:11px; flex-basis:100%;">Tip: choose the file before you start sharing your screen - the system file picker can be visible to others.</div>
-        <div id="iv-cv-paste" class="interactive hidden" style="display:flex; flex-direction:column; gap:6px; flex-basis:100%;">
-          <textarea id="iv-cv-text" rows="6" placeholder="Paste your resume text here" aria-label="Resume text"></textarea>
-          <div class="actions">
-            <button class="act-btn" id="iv-cv-paste-submit" type="button">Use this text</button>
-            <button class="act-btn" id="iv-cv-paste-cancel" type="button">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </details>
 
     <!-- Compact live status strip. -->
     <div id="iv-statusbar" class="interactive">
@@ -808,7 +825,6 @@
         <div class="actions" style="margin-bottom:8px;">
           <button class="act-btn active" id="edit-mode-draw">✏️ Draw</button>
           <button class="act-btn" id="edit-mode-crop">✂️ Crop Area</button>
-          <button class="act-btn" id="edit-apply-crop">Apply Crop</button>
           <button class="act-btn" id="edit-reset">↺ Reset Image</button>
         </div>
         <div class="edit-canvas-wrapper">
@@ -1439,6 +1455,19 @@
     try { localStorage.setItem('overlayOpacity', name); } catch (_) {}
   }));
 
+  // Settings sheet: opened from the header gear, closed by the gear, Close or Escape.
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsSheet = document.getElementById('settings-sheet');
+  function setSettingsOpen(open) {
+    settingsSheet.classList.toggle('hidden', !open);
+    settingsBtn.setAttribute('aria-expanded', String(open));
+    (open ? document.getElementById('settings-close') : settingsBtn).focus();
+  }
+  settingsBtn.addEventListener('click', () => setSettingsOpen(settingsSheet.classList.contains('hidden')));
+  document.getElementById('settings-close').addEventListener('click', () => setSettingsOpen(false));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !e.defaultPrevented && !settingsSheet.classList.contains('hidden')) setSettingsOpen(false);
+  });
   // Platform-aware hotkey text (accelerators come from main.js, env overrides included).
   const IS_MAC = /Mac/.test(navigator.platform || navigator.userAgent);
   const hotkeyText = (name) => window.UxHelpers.formatAccelerator((api.hotkeys || {})[name], IS_MAC);
@@ -2054,7 +2083,6 @@
     const btnClose = document.getElementById('edit-close');
     const btnDraw = document.getElementById('edit-mode-draw');
     const btnCrop = document.getElementById('edit-mode-crop');
-    const btnApplyCrop = document.getElementById('edit-apply-crop');
     const btnReset = document.getElementById('edit-reset');
     // [OCR-DISABLED] const btnOcr = document.getElementById('edit-ocr');
     const btnGetAnswer = document.getElementById('edit-get-answer');
@@ -2186,7 +2214,14 @@
         ctx.setLineDash([]);
       }
     });
-    canvas.addEventListener('mouseup', () => { isDragging = false; });
+    window.addEventListener('mouseup', () => {
+      if (!isDragging) return;
+      isDragging = false;
+      if (currentMode === 'crop' && savedCanvasState) {
+        ctx.putImageData(savedCanvasState, 0, 0);
+        applyCrop();
+      }
+    });
 
     function applyCrop() {
       if (currentMode !== 'crop' || !originalImage) return;
@@ -2205,7 +2240,6 @@
 
     btnDraw.addEventListener('click', () => setMode('draw'));
     btnCrop.addEventListener('click', () => setMode('crop'));
-    btnApplyCrop.addEventListener('click', applyCrop);
     btnReset.addEventListener('click', () => { resetEditor(); setStatus('Reset to original image.'); });
 
     // [OCR-DISABLED] // Best-effort version label: count existing records whose extracted_text
