@@ -21,8 +21,6 @@ answers, and speech-to-text.
   clicks and scrolling still work.
 - **Resizable**, with **position and size remembered** between launches (saved to
   a JSON file in the app's userData folder).
-- **Minimize to a floating dot** — collapses the whole card down to a small 64×64
-  draggable dot; click the dot to restore the previous expanded size.
 - **Show/hide toggle** via global hotkey.
 - **In-overlay right-click menu** instead of a native OS menu, so the menu itself
   stays inside the content-protected window (never leaks on screen share).

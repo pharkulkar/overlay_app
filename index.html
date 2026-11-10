@@ -146,15 +146,6 @@
   .meter.mini { display: inline-block; width: 48px; height: 8px; vertical-align: middle; }
   .meter.mini .meter-fill { display: block; }
 
-  /* Floating dot (S0) — clickable (no-drag) so expand works. */
-  #floating-dot {
-    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-    -webkit-app-region: no-drag;
-  }
-  #floating-dot .dot {
-    width: 36px; height: 36px; border-radius: 50%; background: #4c9aff;
-    border: 2px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-  }
   .hidden { display: none !important; }
 
   /* In-overlay context menu (stays inside the content-protected window) */
@@ -360,6 +351,7 @@
   #settings-pop legend, #vision-popup legend { font-size: 11px; color: #9aa0aa; padding: 0 0 4px; }
   #settings-pop label, #vision-popup fieldset label { display: block; padding: 3px 0; cursor: pointer; }
   */
+  /* [VISION-POPUP-DISABLED] old vision send popup CSS (retired; capture opens the edit modal):
   #vision-popup fieldset { border: 0; margin: 0 0 6px; padding: 0; }
   #vision-popup legend { font-size: 11px; color: #9aa0aa; padding: 0 0 4px; }
   #vision-popup fieldset label { display: block; padding: 3px 0; }
@@ -390,9 +382,28 @@
   .vp-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .vp-actions .act-btn:disabled { opacity: 0.45; }
   .vp-error { font-size: 11px; color: #ffb4b4; min-height: 14px; word-break: break-word; }
-  /* [OCR-DISABLED] was: #btn-settings:focus-visible, #settings-pop input:focus-visible, (selectors removed) */
+  [OCR-DISABLED] was: #btn-settings:focus-visible, #settings-pop input:focus-visible, (selectors removed)
   #vision-popup input:focus-visible,
   #vision-popup button:focus-visible { outline: 2px solid rgba(76,154,255,0.9); outline-offset: 2px; }
+  */
+
+  /* ── Staged screenshots strip (fresh-capture mode of the edit modal) ── */
+  #edit-stage { margin-bottom: 8px; }
+  .fs-strip { display: flex; gap: 6px; overflow-x: auto; padding: 6px 2px 8px; }
+  .fs-thumb { position: relative; flex: 0 0 auto; width: 84px; height: 56px; }
+  .fs-thumb img {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.2); display: block;
+    -webkit-user-drag: none; user-select: none;
+  }
+  .fs-rm {
+    position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; padding: 0;
+    border-radius: 50%; border: 0; background: rgba(163,21,21,0.95); color: #fff;
+    font-size: 10px; line-height: 18px; -webkit-app-region: no-drag;
+  }
+  .fs-rm:disabled { opacity: 0.45; }
+  #edit-add-shot:disabled, #edit-vision-send:disabled { opacity: 0.45; }
+  #edit-stage button:focus-visible { outline: 2px solid rgba(76,154,255,0.9); outline-offset: 2px; }
 
   /* ── Small solution panel (the whole window shrinks to this) ─────────── */
   #compact-view {
@@ -508,7 +519,6 @@
     <!-- [OCR-DISABLED] capture-mode settings gear (only one mode remains)
     <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings" aria-haspopup="true" aria-expanded="false">⚙︎</button>
     -->
-    <button class="icon-btn" id="btn-minimize" data-tip="Minimize to dot" aria-label="Minimize to dot">—</button>
   </div>
 
   <!-- One-time consent / privacy notice (dismissed flag in localStorage) -->
@@ -720,6 +730,15 @@
     <div id="edit-body">
       <!-- Image editor (shown only for screenshot records) -->
       <div id="edit-image-tools" class="hidden">
+        <!-- Staged screenshots (fresh-capture mode only) -->
+        <div id="edit-stage" class="hidden" role="group" aria-label="Staged screenshots">
+          <div class="actions">
+            <span id="edit-stage-count" class="zone-label" role="status" aria-live="polite"></span>
+            <span class="spacer"></span>
+            <button class="act-btn" id="edit-add-shot" type="button" data-tip="Keep this screenshot, then capture another to send together">＋ Add another screenshot</button>
+          </div>
+          <div id="edit-stage-strip" class="fs-strip" aria-label="Staged screenshots"></div>
+        </div>
         <div class="actions" style="margin-bottom:8px;">
           <button class="act-btn active" id="edit-mode-draw">✏️ Draw</button>
           <button class="act-btn" id="edit-mode-crop">✂️ Crop Area</button>
@@ -782,7 +801,7 @@
 </div>
 -->
 
-<!-- Vision send popup: shown after every capture (hotkey or button) -->
+<!-- [VISION-POPUP-DISABLED] old vision send popup markup (retired; capture opens the edit modal)
 <div id="vision-popup" class="hidden interactive" role="dialog" aria-modal="true" aria-labelledby="vp-title">
   <div id="vp-card">
     <div id="vp-title">Send to OpenAI · <span id="vp-count"></span></div>
@@ -801,6 +820,8 @@
     </div>
   </div>
 </div>
+-->
+
 
 <!-- Small solution panel: the window shrinks to this so the solution can be typed from.
      The header drags the window; the toggle brings the full overlay back. -->
@@ -812,14 +833,10 @@
   <div id="compact-body" class="interactive"></div>
 </div>
 
-<!-- Floating dot (S0) -->
-<div id="floating-dot" class="hidden" data-tip="Click to expand" aria-label="Expand overlay">
-  <div class="dot"></div>
-</div>
-
 <script src="audio.js"></script>
 <script src="interview.js"></script>
 <script src="vision-batch.js"></script>
+<script src="capture-flow.js"></script>
 <script src="solution-format.js"></script>
 <script src="ux-helpers.js"></script>
 <script src="stealth-ui.js"></script>
@@ -1335,7 +1352,6 @@
 
   // ── Elements ────────────────────────────────────────────
   const overlayCard = document.getElementById('overlay-card');
-  const floatingDot = document.getElementById('floating-dot');
   const statusDot = document.getElementById('status-dot');
   const answerStatus = document.getElementById('answer-status');
   const answerBody = document.getElementById('answer-body');
@@ -1457,19 +1473,6 @@
   navs.interview.addEventListener('click', () => showView('interview'));
   navs.gallery.addEventListener('click', () => showView('gallery'));
   navs.audio.addEventListener('click', () => showView('audio'));
-
-  // ── Minimize / expand ───────────────────────────────────
-  document.getElementById('btn-minimize').addEventListener('click', () => {
-    overlayCard.classList.add('hidden');
-    floatingDot.classList.remove('hidden');
-    api.toggleOverlayMode && api.toggleOverlayMode(true);
-  });
-  function expandOverlay() {
-    floatingDot.classList.add('hidden');
-    overlayCard.classList.remove('hidden');
-    api.toggleOverlayMode && api.toggleOverlayMode(false);
-  }
-  floatingDot.addEventListener('click', expandOverlay);
 
   // ── Tone ────────────────────────────────────────────────
   toneSelect.addEventListener('change', () => {
@@ -1627,7 +1630,7 @@
   })();
 
   // On-screen capture buttons: same paths as the ⌘⇧1 / ⌘⇧2 hotkeys; both open
-  // the vision send popup. The overlay is content-protected, so it is not captured.
+  // the edit screen directly. The overlay is content-protected, so it is not captured.
   ['full', 'region'].forEach((kind) => {
     const btn = document.getElementById('btn-capture-' + kind);
     if (!btn) return;
@@ -1933,6 +1936,13 @@
     // [OCR-DISABLED] const btnOcr = document.getElementById('edit-ocr');
     const btnGetAnswer = document.getElementById('edit-get-answer');
     const canvas = document.getElementById('edit-canvas');
+    // Fresh-capture mode (staged screenshots + add-another button).
+    const CF = window.CaptureFlow;
+    const stageBox = document.getElementById('edit-stage');
+    const stageCount = document.getElementById('edit-stage-count');
+    const stageStrip = document.getElementById('edit-stage-strip');
+    const btnAddShot = document.getElementById('edit-add-shot');
+    const visionRadios = document.querySelectorAll('input[name="edit-vision-mode"]');
 
     // Modal/editor state.
     let ctx = null;
@@ -1946,6 +1956,13 @@
     let editRecordId = null;
     let editSourceType = null;         // original record's source_type
     let sourceExtractedText = '';      // original text (text/voice records)
+    // Fresh-capture state machine (pure logic lives in capture-flow.js).
+    let flow = CF.createState();       // { mode: closed|fresh|record, staged, current, busy, sent }
+    let gen = 0;                       // session generation: guards late responses
+    let pendingCapture = null;         // one deferred capture while a fresh send is in flight
+    let freshRid = null;               // request id of the in-flight fresh send (so closing can cancel it)
+    let canvasReady = false;           // fresh image drawn on the canvas
+    let notifyMain = () => {};         // status line outside the modal (set by initVisionCapture)
 
     function setStatus(msg) { statusEl.textContent = msg || ''; }
     // Loader (+ Stop) in the status line; the next setStatus() replaces it.
@@ -1956,7 +1973,9 @@
     // Only one long operation at a time: toggle the action buttons.
     function setBusy(on) {
       // [OCR-DISABLED] [btnOcr, btnGetAnswer, btnVision].forEach((b) => { if (b) b.disabled = !!on; });
-      [btnGetAnswer, btnVision].forEach((b) => { if (b) b.disabled = !!on; });
+      [btnGetAnswer, btnVision, btnAddShot].forEach((b) => { if (b) b.disabled = !!on; });
+      if (!on && flow.mode === 'fresh') updateSendUi();
+      if (flow.mode === 'fresh') renderStage();
     }
     function restoreNodes(el, nodes) {
       el.textContent = '';
@@ -1967,12 +1986,30 @@
         (st && st.indexOf('screenshot') === 0);
     }
 
-    function closeModal() {
+    // Visual cleanup only (does not touch the fresh-capture state).
+    function closeVisual() {
       modal.classList.remove('open');
       // Release the (potentially large) canvas + image references.
       originalImage = null;
       savedCanvasState = null;
+      canvasReady = false;
       if (ctx && canvas.width) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    // Close / Escape / backdrop: discards the fresh capture AND the staged list.
+    function closeModal() {
+      // Close/Escape must ALWAYS dismiss immediately - even in the middle of a send
+      // (a quick hide matters while sharing a screen). If a fresh send is running,
+      // stop waiting for it first; bumping `gen` below makes its late response a
+      // no-op for this UI (it can only refresh the Gallery).
+      const wasFreshBusy = flow.mode === 'fresh' && flow.busy;
+      if (wasFreshBusy && freshRid) stopRequest(freshRid);
+      freshRid = null;
+      closeVisual();
+      gen += 1;
+      flow = CF.discard(flow);
+      pendingCapture = null;
+      resetFreshUi();
+      if (wasFreshBusy) setBusy(false);   // re-enable the buttons the aborted send had disabled
     }
 
     btnClose.addEventListener('click', closeModal);
@@ -2156,6 +2193,7 @@
       return off.toDataURL('image/png');
     }
     btnVision.addEventListener('click', async () => {
+      if (flow.mode === 'fresh') { sendFresh(); return; }
       if (!api.visionAsk) { setStatus('Vision bridge unavailable.'); return; }
       if (!canvas.width || !canvas.height) { setStatus('No image to send.'); return; }
       const modeEl = document.querySelector('input[name="edit-vision-mode"]:checked');
@@ -2191,8 +2229,227 @@
       }
     });
 
+    // ── Fresh capture mode: edit the screenshot BEFORE anything is saved ────
+    function readLastMode() {
+      let v = null;
+      try { v = localStorage.getItem(CF.STORAGE_KEY); } catch (_) {}
+      return CF.normalizeLastMode(v);
+    }
+    function saveLastMode(m) {
+      try { localStorage.setItem(CF.STORAGE_KEY, CF.normalizeLastMode(m)); } catch (_) {}
+    }
+    function selectedMode() {
+      let v = 'coding';
+      visionRadios.forEach((r) => { if (r.checked) v = r.value; });
+      return CF.normalizeLastMode(v);
+    }
+    visionRadios.forEach((r) => r.addEventListener('change', () => { if (r.checked) saveLastMode(r.value); }));
+
+    function resetFreshUi() {
+      stageBox.classList.add('hidden');
+      stageStrip.textContent = '';
+      stageCount.textContent = '';
+      btnAddShot.disabled = false;
+      btnAddShot.removeAttribute('data-tip');
+      btnVision.textContent = '🧠 Get solution from image';
+    }
+    function renderStage() {
+      stageBox.classList.toggle('hidden', flow.mode !== 'fresh');
+      stageStrip.textContent = '';
+      if (flow.mode !== 'fresh') return;
+      stageCount.textContent = CF.countLabel(flow);
+      flow.staged.forEach((item, i) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'fs-thumb';
+        const img = document.createElement('img');
+        img.src = item.dataUrl;
+        img.alt = 'Staged screenshot ' + (i + 1);
+        img.draggable = false;
+        const rm = document.createElement('button');
+        rm.className = 'fs-rm';
+        rm.type = 'button';
+        rm.textContent = '✕';
+        rm.setAttribute('aria-label', 'Remove staged screenshot ' + (i + 1));
+        rm.disabled = flow.busy;
+        rm.addEventListener('click', () => {
+          if (flow.busy) return;
+          flow = CF.removeStaged(flow, item.id);
+          renderStage();
+          updateSendUi();
+        });
+        wrap.appendChild(img); wrap.appendChild(rm); stageStrip.appendChild(wrap);
+      });
+    }
+    function updateSendUi() {
+      if (flow.mode !== 'fresh') { btnVision.textContent = '🧠 Get solution from image'; return; }
+      btnVision.textContent = '🧠 ' + CF.sendLabel(flow.staged.length + 1);
+      btnAddShot.disabled = flow.busy || !CF.canStage(flow);
+      if (flow.sent) btnAddShot.setAttribute('data-tip', 'Capture a new screenshot first');
+      else if (flow.staged.length + 2 > window.VisionBatch.MAX_BATCH) {
+        btnAddShot.setAttribute('data-tip', 'Batch limit reached (' + window.VisionBatch.MAX_BATCH + ' images)');
+      } else btnAddShot.setAttribute('data-tip', 'Keep this screenshot, then capture another to send together');
+    }
+    function showPlaceholder() {
+      answerEl.textContent = '';
+      const sp = document.createElement('span');
+      sp.className = 'muted';
+      sp.textContent = 'The answer will appear here after you press Get solution from image.';
+      answerEl.appendChild(sp);
+    }
+    // Load item.dataUrl into the canvas and (re)build the fresh UI.
+    function loadFresh(item, preselect) {
+      gen += 1;
+      canvasReady = false;
+      titleEl.textContent = 'New screenshot';
+      textLabel.style.display = 'none';
+      textArea.style.display = 'none';
+      btnGetAnswer.style.display = 'none';
+      imageTools.classList.remove('hidden');
+      showPlaceholder();
+      if (preselect) {
+        const m = readLastMode();
+        visionRadios.forEach((r) => { r.checked = (r.value === m); });
+      }
+      ctx = canvas.getContext('2d');
+      const img = new Image();
+      originalImage = img;
+      img.onload = () => {
+        if (originalImage !== img) return;
+        resetEditor();
+        canvasReady = true;
+        setStatus('Draw or crop, then press Get solution from image. (Ctrl/Cmd+Enter)');
+      };
+      img.onerror = () => { if (originalImage === img) setStatus('Could not load the captured screenshot.'); };
+      img.src = item.dataUrl;
+      modal.classList.add('open');
+      setStatus('Loading screenshot…');
+      renderStage();
+      updateSendUi();
+      btnVision.focus();
+      if (document.activeElement !== btnVision) { card.setAttribute('tabindex', '-1'); card.focus(); }
+    }
+    // Entry point for every capture (hotkeys + on-screen buttons).
+    window.openFreshCapture = function (payload, notify) {
+      if (typeof notify === 'function') notifyMain = notify;
+      const r = CF.onCapture(flow, payload);
+      switch (r.action) {
+        case 'ignore': return;
+        case 'full':
+          if (modal.classList.contains('open')) setStatus(r.message); else notifyMain(r.message);
+          return;
+        case 'defer':
+          pendingCapture = payload;
+          setStatus('Capture queued - it opens when the current request finishes.');
+          return;
+        case 'open-fresh':
+        case 'replace-sent':
+        case 'replace-record':
+          flow = r.state;
+          loadFresh(flow.current, r.action !== 'replace-sent');
+          return;
+        case 'stage-and-replace': {
+          // Stage what the user currently sees (falls back to the raw capture if it never finished loading).
+          const edited = canvasReady ? canvasToVisionDataUrl() : flow.current.dataUrl;
+          const s = CF.stageCurrent(flow, edited, flow.current.sourceType);
+          if (!s.added) { setStatus('Batch limit reached (' + window.VisionBatch.MAX_BATCH + ' images). Send or remove one.'); return; }
+          flow = CF.loadCurrent(s.state, r.pendingCurrent);
+          loadFresh(flow.current, false);
+          return;
+        }
+        default: return;
+      }
+    };
+    // "Add another screenshot": stage the edited image, close, keep the staged list.
+    btnAddShot.addEventListener('click', () => {
+      if (flow.mode !== 'fresh' || flow.busy || !canvasReady || !CF.canStage(flow)) return;
+      const s = CF.stageCurrent(flow, canvasToVisionDataUrl(), flow.current.sourceType);
+      if (!s.added) return;
+      const n = s.state.staged.length;
+      flow = CF.closeKeepStaged(s.state);
+      closeVisual();
+      gen += 1;
+      pendingCapture = null;
+      resetFreshUi();
+      notifyMain(n + ' screenshot' + (n === 1 ? '' : 's') + ' staged - capture another');
+    });
+    async function sendFresh() {
+      if (flow.mode !== 'fresh' || flow.busy) return;
+      if (!api.visionAsk) { setStatus('Vision bridge unavailable.'); return; }
+      if (!canvasReady || !canvas.width || !canvas.height) { setStatus('No image to send.'); return; }
+      const pack = CF.imagesToSend(flow, canvasToVisionDataUrl());
+      if (!pack.ok) { setStatus(pack.error); return; }
+      const mode = selectedMode();
+      saveLastMode(mode);
+      const rid = genRequestId('vis');
+      freshRid = rid;
+      const myGen = gen;
+      const prevAnswer = Array.from(answerEl.childNodes);
+      const label = window.VisionBatch.batchLabel(pack.count);
+      showLoader(answerEl, 'Analyzing ' + label + '…', () => stopRequest(rid));
+      setStatus('Sending ' + label + ' to OpenAI…');
+      flow = CF.setBusy(flow, true);
+      setBusy(true);
+      try {
+        const data = await api.visionAsk(pack.images, mode, toneSelect.value, undefined, pack.source_types, rid);
+        if (myGen !== gen) {            // modal was reopened/replaced meanwhile: never touch its UI
+          if (data && data.success) loadGallery({ silent: true });
+          return;
+        }
+        if (isCancelledResult(data)) {
+          restoreNodes(answerEl, prevAnswer);   // edits + staged list untouched
+          setStatus('Cancelled.');
+        } else if (data && data.success) {
+          answerEl.textContent = data.answer || 'No answer returned.';
+          flow = CF.markSent(flow);
+          setStatus('Solution ready - saved as ONE new Gallery entry.');
+          loadGallery({ silent: true });
+        } else if (data && data.answer) {
+          answerEl.textContent = data.answer;
+          flow = CF.markSent(flow);
+          setStatus('Solution ready, but it could not be saved: ' + (data.error || 'unknown error'));
+        } else {
+          restoreNodes(answerEl, prevAnswer);   // keep everything for retry
+          setStatus('Vision request failed: ' + ((data && data.error) || 'unknown error'));
+        }
+      } catch (err) {
+        if (myGen !== gen) return;
+        restoreNodes(answerEl, prevAnswer);
+        setStatus('Vision request failed: ' + (err && err.message ? err.message : String(err)));
+      } finally {
+        if (freshRid === rid) freshRid = null;
+        if (myGen === gen) {
+          flow = CF.setBusy(flow, false);
+          setBusy(false);
+          renderStage();
+          updateSendUi();
+          if (pendingCapture) {
+            const p = pendingCapture;
+            pendingCapture = null;
+            window.openFreshCapture(p);
+          }
+        }
+      }
+    }
+    // Ctrl/Cmd+Enter sends in fresh mode.
+    modal.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && flow.mode === 'fresh' && !flow.busy
+          && modal.classList.contains('open')) {
+        e.preventDefault();
+        sendFresh();
+      }
+    }, true);
+
     // ── Open the modal for a record (routed by source_type) ───────────────
     async function openEditModal(id, sourceType) {
+      // Record mode: drop any fresh-capture state (staged list, labels, radios).
+      const wasFreshBusy = flow.mode === 'fresh' && flow.busy;
+      gen += 1;
+      flow = Object.assign(CF.createState(), { mode: 'record' });
+      pendingCapture = null;
+      canvasReady = false;
+      resetFreshUi();
+      if (wasFreshBusy) setBusy(false);
+      visionRadios.forEach((r) => { r.checked = (r.value === 'coding'); });
       editRecordId = id;
       editSourceType = sourceType;
       sourceExtractedText = '';
@@ -3046,16 +3303,16 @@
   }
   checkBackend();
 
-  // ── Direct-to-OpenAI vision capture (send popup) ───────────
+  // ── Direct-to-OpenAI vision capture (opens the edit screen directly) ───
   (function initVisionCapture() {
     const VB = window.VisionBatch;
     if (!VB) { console.warn('[vision] vision-batch.js not loaded'); return; }
     const $ = (id) => document.getElementById(id);
-    const popup = $('vision-popup'), strip = $('vp-strip'), countEl = $('vp-count'), msgEl = $('vp-msg');
-    const addBtn = $('vp-add'), sendBtn = $('vp-send'), cancelBtn = $('vp-cancel');
+    // [VISION-POPUP-DISABLED] const popup = $('vision-popup'), strip = $('vp-strip'), countEl = $('vp-count'), msgEl = $('vp-msg');
+    // [VISION-POPUP-DISABLED] const addBtn = $('vp-add'), sendBtn = $('vp-send'), cancelBtn = $('vp-cancel');
     // [OCR-DISABLED] const settingsBtn = $('btn-settings'), settingsPop = $('settings-pop');
     // [OCR-DISABLED] const cmRadios = document.querySelectorAll('input[name="capture-mode"]');
-    const vmRadios = document.querySelectorAll('input[name="vision-mode"]');
+    // [VISION-POPUP-DISABLED] const vmRadios = document.querySelectorAll('input[name="vision-mode"]');
 
     // [OCR-DISABLED] // Capture mode (persisted; mirrored to main like the tone setting).
     // [OCR-DISABLED] let stored = null;
@@ -3084,115 +3341,153 @@
     // [OCR-DISABLED] document.addEventListener('keydown', (e) => {
     // [OCR-DISABLED]   if (e.key === 'Escape' && !settingsPop.classList.contains('hidden')) setSettingsOpen(false);
     // [OCR-DISABLED] });
-    let batch = VB.createBatch();
-    let sending = false;
-    const isOpen = () => !popup.classList.contains('hidden');
-    function selectedMode() {
-      let v = 'coding';
-      vmRadios.forEach((r) => { if (r.checked) v = r.value; });
-      return VB.normalizeMode(v);
-    }
-    function openPopup() { popup.classList.remove('hidden'); renderPopup(); sendBtn.focus(); }
-    function closePopup() { popup.classList.add('hidden'); msgEl.textContent = ''; }
+    // [VISION-POPUP-DISABLED] let batch = VB.createBatch();
+    // [VISION-POPUP-DISABLED] let sending = false;
+    // [VISION-POPUP-DISABLED] const isOpen = () => !popup.classList.contains('hidden');
+    // [VISION-POPUP-DISABLED] function selectedMode() {
+    // [VISION-POPUP-DISABLED]   let v = 'coding';
+    // [VISION-POPUP-DISABLED]   vmRadios.forEach((r) => { if (r.checked) v = r.value; });
+    // [VISION-POPUP-DISABLED]   return VB.normalizeMode(v);
+    // [VISION-POPUP-DISABLED] }
+    // [VISION-POPUP-DISABLED] function openPopup() { popup.classList.remove('hidden'); renderPopup(); sendBtn.focus(); }
+    // [VISION-POPUP-DISABLED] function closePopup() { popup.classList.add('hidden'); msgEl.textContent = ''; }
 
-    function renderPopup() {
-      countEl.textContent = VB.batchLabel(batch.length);
-      strip.textContent = '';
-      batch.forEach((item, i) => {
-        const wrap = document.createElement('div');
-        wrap.className = 'vp-thumb';
-        const img = document.createElement('img');
-        img.src = item.dataUrl;
-        img.alt = 'Screenshot ' + (i + 1);
-        const rm = document.createElement('button');
-        rm.className = 'vp-rm';
-        rm.type = 'button';
-        rm.textContent = '✕';
-        rm.setAttribute('aria-label', 'Remove image ' + (i + 1));
-        rm.disabled = sending;
-        rm.addEventListener('click', () => {
-          if (sending) return;
-          batch = VB.removeImage(batch, item.id);
-          if (batch.length === 0) { closePopup(); } else { msgEl.textContent = ''; renderPopup(); }
-        });
-        wrap.appendChild(img); wrap.appendChild(rm); strip.appendChild(wrap);
-      });
-      sendBtn.disabled = batch.length === 0 || sending;
-      sendBtn.textContent = sending ? 'Sending…' : 'Send';
-      const full = VB.isFull(batch);
-      addBtn.disabled = full || sending;
-      if (full) addBtn.setAttribute('data-tip', 'Batch limit reached (' + VB.MAX_BATCH + ' images)');
-      else addBtn.removeAttribute('data-tip');
-      cancelBtn.disabled = sending;
+    // [VISION-POPUP-DISABLED] function renderPopup() {
+    // [VISION-POPUP-DISABLED]   countEl.textContent = VB.batchLabel(batch.length);
+    // [VISION-POPUP-DISABLED]   strip.textContent = '';
+    // [VISION-POPUP-DISABLED]   batch.forEach((item, i) => {
+    // [VISION-POPUP-DISABLED]     const wrap = document.createElement('div');
+    // [VISION-POPUP-DISABLED]     wrap.className = 'vp-thumb';
+    // [VISION-POPUP-DISABLED]     const img = document.createElement('img');
+    // [VISION-POPUP-DISABLED]     img.src = item.dataUrl;
+    // [VISION-POPUP-DISABLED]     img.alt = 'Screenshot ' + (i + 1);
+    // [VISION-POPUP-DISABLED]     const rm = document.createElement('button');
+    // [VISION-POPUP-DISABLED]     rm.className = 'vp-rm';
+    // [VISION-POPUP-DISABLED]     rm.type = 'button';
+    // [VISION-POPUP-DISABLED]     rm.textContent = '✕';
+    // [VISION-POPUP-DISABLED]     rm.setAttribute('aria-label', 'Remove image ' + (i + 1));
+    // [VISION-POPUP-DISABLED]     rm.disabled = sending;
+    // [VISION-POPUP-DISABLED]     rm.addEventListener('click', () => {
+    // [VISION-POPUP-DISABLED]       if (sending) return;
+    // [VISION-POPUP-DISABLED]       batch = VB.removeImage(batch, item.id);
+    // [VISION-POPUP-DISABLED]       if (batch.length === 0) { closePopup(); } else { msgEl.textContent = ''; renderPopup(); }
+    // [VISION-POPUP-DISABLED]     });
+    // [VISION-POPUP-DISABLED]     wrap.appendChild(img); wrap.appendChild(rm); strip.appendChild(wrap);
+    // [VISION-POPUP-DISABLED]   });
+    // [VISION-POPUP-DISABLED]   sendBtn.disabled = batch.length === 0 || sending;
+    // [VISION-POPUP-DISABLED]   sendBtn.textContent = sending ? 'Sending…' : 'Send';
+    // [VISION-POPUP-DISABLED]   const full = VB.isFull(batch);
+    // [VISION-POPUP-DISABLED]   addBtn.disabled = full || sending;
+    // [VISION-POPUP-DISABLED]   if (full) addBtn.setAttribute('data-tip', 'Batch limit reached (' + VB.MAX_BATCH + ' images)');
+    // [VISION-POPUP-DISABLED]   else addBtn.removeAttribute('data-tip');
+    // [VISION-POPUP-DISABLED]   cancelBtn.disabled = sending;
+    // [VISION-POPUP-DISABLED] }
+
+    // [VISION-POPUP-DISABLED] api.onVisionCapture && api.onVisionCapture((payload) => {
+    // [VISION-POPUP-DISABLED]   if (!payload || typeof payload.dataUrl !== 'string') return;
+    // [VISION-POPUP-DISABLED]   // Window may be shrunk to the small solution panel: bring the full overlay back first.
+    // [VISION-POPUP-DISABLED]   if (window.closeSolutionPanel) window.closeSolutionPanel();
+    // [VISION-POPUP-DISABLED]   // Window may be shrunk to the dot: expand it first.
+    // [VISION-POPUP-DISABLED]   if (!floatingDot.classList.contains('hidden')) expandOverlay();
+    // [VISION-POPUP-DISABLED]   const res = VB.addImage(batch, { dataUrl: payload.dataUrl, sourceType: payload.sourceType });
+    // [VISION-POPUP-DISABLED]   batch = res.batch;
+    // [VISION-POPUP-DISABLED]   msgEl.textContent = res.capped
+    // [VISION-POPUP-DISABLED]     ? 'Batch limit reached (' + VB.MAX_BATCH + ' images). Send or remove one.' : '';
+    // [VISION-POPUP-DISABLED]   if (batch.length === 0) return;
+    // [VISION-POPUP-DISABLED]   openPopup();
+    // [VISION-POPUP-DISABLED] });
+
+    // [VISION-POPUP-DISABLED] addBtn.addEventListener('click', () => {
+    // [VISION-POPUP-DISABLED]   if (sending || VB.isFull(batch)) return;
+    // [VISION-POPUP-DISABLED]   closePopup();
+    // [VISION-POPUP-DISABLED]   setStatus('Vision batch: ' + VB.batchLabel(batch.length) + ' staged — capture another', 'idle');
+    // [VISION-POPUP-DISABLED] });
+
+    // [VISION-POPUP-DISABLED] function cancelBatch() {
+    // [VISION-POPUP-DISABLED]   if (sending) return;
+    // [VISION-POPUP-DISABLED]   batch = VB.clearBatch();
+    // [VISION-POPUP-DISABLED]   closePopup();
+    // [VISION-POPUP-DISABLED] }
+    // [VISION-POPUP-DISABLED] cancelBtn.addEventListener('click', cancelBatch);
+    // [VISION-POPUP-DISABLED] document.addEventListener('keydown', (e) => {
+    // [VISION-POPUP-DISABLED]   if (e.key !== 'Escape' || !isOpen()) return;
+    // [VISION-POPUP-DISABLED]   e.stopPropagation();
+    // [VISION-POPUP-DISABLED]   cancelBatch();
+    // [VISION-POPUP-DISABLED] }, true);
+
+    // [VISION-POPUP-DISABLED] sendBtn.addEventListener('click', async () => {
+    // [VISION-POPUP-DISABLED]   if (sending || batch.length === 0) return;
+    // [VISION-POPUP-DISABLED]   const req = VB.buildVisionRequest(batch, selectedMode());
+    // [VISION-POPUP-DISABLED]   sending = true;
+    // [VISION-POPUP-DISABLED]   const rid = genRequestId('vis');
+    // [VISION-POPUP-DISABLED]   showLoader(msgEl, 'Sending ' + VB.batchLabel(batch.length) + ' to OpenAI…', () => stopRequest(rid));
+    // [VISION-POPUP-DISABLED]   renderPopup();
+    // [VISION-POPUP-DISABLED]   try {
+    // [VISION-POPUP-DISABLED]     const data = await api.visionAsk(req.images, req.mode, toneSelect.value, undefined, req.source_types, rid);
+    // [VISION-POPUP-DISABLED]     if (window.UxHelpers && window.UxHelpers.isCancelled(data)) {
+    // [VISION-POPUP-DISABLED]       // User pressed Stop: keep the staged batch and leave the popup open.
+    // [VISION-POPUP-DISABLED]       msgEl.textContent = 'Cancelled.';
+    // [VISION-POPUP-DISABLED]     } else if (data && data.success) {
+    // [VISION-POPUP-DISABLED]       batch = VB.clearBatch();
+    // [VISION-POPUP-DISABLED]       closePopup();
+    // [VISION-POPUP-DISABLED]       showView('answer');
+    // [VISION-POPUP-DISABLED]       setStatus('Answer', 'ok');
+    // [VISION-POPUP-DISABLED]       answerBody.textContent = data.answer || 'No answer returned.';
+    // [VISION-POPUP-DISABLED]       activeRecordId = data.record_id || null;
+    // [VISION-POPUP-DISABLED]       renderHistory([]);
+    // [VISION-POPUP-DISABLED]       ocrInput.value = '';
+    // [VISION-POPUP-DISABLED]       loadGallery({ silent: true });
+    // [VISION-POPUP-DISABLED]     } else {
+    // [VISION-POPUP-DISABLED]       msgEl.textContent = 'Failed: ' + ((data && data.error) || 'unknown error');
+    // [VISION-POPUP-DISABLED]       setStatus('Error', 'error');
+    // [VISION-POPUP-DISABLED]     }
+    // [VISION-POPUP-DISABLED]   } catch (err) {
+    // [VISION-POPUP-DISABLED]     msgEl.textContent = 'Failed: ' + ((err && err.message) || err)
+    // [VISION-POPUP-DISABLED]       + ' (backendUrl=' + (api.backendUrl || 'undefined') + ')';
+    // [VISION-POPUP-DISABLED]     setStatus('Error', 'error');
+    // [VISION-POPUP-DISABLED]   } finally {
+    // [VISION-POPUP-DISABLED]     sending = false;
+    // [VISION-POPUP-DISABLED]     if (isOpen()) renderPopup();
+    // [VISION-POPUP-DISABLED]   }
+    // [VISION-POPUP-DISABLED] });
+
+    // Capture diagnostics: printed in the terminal that runs `npm start`.
+    const clog = (m) => { try { console.log('[capture] ' + m); if (api.logCapture) api.logCapture(m); } catch (_) {} };
+
+    // A capture failure must be visible whatever tab/state the overlay is in:
+    // bring the full overlay back, switch to the Answer tab, show the reason.
+    function showCaptureError(msg) {
+      clog('ERROR ' + msg);
+      try {
+        if (window.closeSolutionPanel) window.closeSolutionPanel();
+        showView('answer');
+        setStatus('Capture failed', 'error');
+        answerBody.textContent = msg;
+      } catch (_) { /* never let the error path throw */ }
     }
+    api.onCaptureError && api.onCaptureError((p) => showCaptureError((p && p.error) || 'Capture failed.'));
 
     api.onVisionCapture && api.onVisionCapture((payload) => {
-      if (!payload || typeof payload.dataUrl !== 'string') return;
-      // Window may be shrunk to the small solution panel: bring the full overlay back first.
-      if (window.closeSolutionPanel) window.closeSolutionPanel();
-      // Window may be shrunk to the dot: expand it first.
-      if (!floatingDot.classList.contains('hidden')) expandOverlay();
-      const res = VB.addImage(batch, { dataUrl: payload.dataUrl, sourceType: payload.sourceType });
-      batch = res.batch;
-      msgEl.textContent = res.capped
-        ? 'Batch limit reached (' + VB.MAX_BATCH + ' images). Send or remove one.' : '';
-      if (batch.length === 0) return;
-      openPopup();
-    });
-
-    addBtn.addEventListener('click', () => {
-      if (sending || VB.isFull(batch)) return;
-      closePopup();
-      setStatus('Vision batch: ' + VB.batchLabel(batch.length) + ' staged — capture another', 'idle');
-    });
-
-    function cancelBatch() {
-      if (sending) return;
-      batch = VB.clearBatch();
-      closePopup();
-    }
-    cancelBtn.addEventListener('click', cancelBatch);
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || !isOpen()) return;
-      e.stopPropagation();
-      cancelBatch();
-    }, true);
-
-    sendBtn.addEventListener('click', async () => {
-      if (sending || batch.length === 0) return;
-      const req = VB.buildVisionRequest(batch, selectedMode());
-      sending = true;
-      const rid = genRequestId('vis');
-      showLoader(msgEl, 'Sending ' + VB.batchLabel(batch.length) + ' to OpenAI…', () => stopRequest(rid));
-      renderPopup();
+      if (!payload || typeof payload.dataUrl !== 'string' || !payload.dataUrl) {
+        showCaptureError('The screenshot arrived empty. On macOS, allow Screen Recording for the app '
+          + 'that runs the overlay (System Settings > Privacy & Security > Screen Recording), then relaunch it.');
+        return;
+      }
+      clog('received ' + (payload.sourceType || 'capture') + ' (' + Math.round(payload.dataUrl.length / 1024) + ' KB)');
       try {
-        const data = await api.visionAsk(req.images, req.mode, toneSelect.value, undefined, req.source_types, rid);
-        if (window.UxHelpers && window.UxHelpers.isCancelled(data)) {
-          // User pressed Stop: keep the staged batch and leave the popup open.
-          msgEl.textContent = 'Cancelled.';
-        } else if (data && data.success) {
-          batch = VB.clearBatch();
-          closePopup();
-          showView('answer');
-          setStatus('Answer', 'ok');
-          answerBody.textContent = data.answer || 'No answer returned.';
-          activeRecordId = data.record_id || null;
-          renderHistory([]);
-          ocrInput.value = '';
-          loadGallery({ silent: true });
-        } else {
-          msgEl.textContent = 'Failed: ' + ((data && data.error) || 'unknown error');
-          setStatus('Error', 'error');
-        }
+        // Window may be shrunk to the small solution panel: bring the full overlay back first.
+        if (window.closeSolutionPanel) window.closeSolutionPanel();
+        if (!window.openFreshCapture) { showCaptureError('Internal: the screenshot editor did not load. Reload the overlay.'); return; }
+        // Every capture opens the edit screen directly (see initEditModal / capture-flow.js).
+        window.openFreshCapture(payload, (m) => setStatus(m, 'idle'));
+        const m = document.getElementById('edit-modal');
+        const opened = !!(m && m.classList.contains('open'));
+        clog('editor ' + (opened ? 'opened' : 'NOT opened (capture was queued or the batch is full; see the status bar)'));
       } catch (err) {
-        msgEl.textContent = 'Failed: ' + ((err && err.message) || err)
-          + ' (backendUrl=' + (api.backendUrl || 'undefined') + ')';
-        setStatus('Error', 'error');
-      } finally {
-        sending = false;
-        if (isOpen()) renderPopup();
+        showCaptureError('Could not open the screenshot editor: ' + (err && err.message ? err.message : String(err)));
       }
     });
+    clog('screenshot editor wiring ready');
   })();
 </script>
 </body>

@@ -64,7 +64,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Overlay controls
-  toggleOverlayMode: (isMinimized) => ipcRenderer.send('toggle-overlay-mode', isMinimized),
   saveTranscript: (speaker, text) => ipcRenderer.send('save-transcript', { speaker, text }),
 
   // Region selection window -> main process
@@ -93,6 +92,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // [OCR-DISABLED]   onSolveStatus: (cb) => ipcRenderer.on('solve-status', (_e, payload) => cb(payload)),
   onSolveAnswer: (cb) => ipcRenderer.on('solve-answer', (_e, payload) => cb(payload)),
   onSolveError: (cb) => ipcRenderer.on('solve-error', (_e, payload) => cb(payload)),
+  // Capture failures (screen permission, hotkey not registered, bad region...).
+  onCaptureError: (cb) => ipcRenderer.on('capture-error', (_e, payload) => cb(payload)),
+  // Renderer -> main: write capture diagnostics into the terminal running `npm start`.
+  logCapture: (msg) => ipcRenderer.send('capture-log', String(msg).slice(0, 500)),
 
   // Main process -> overlay: ask-now hotkey pressed (request a suggestion)
   onAskNow: (cb) => ipcRenderer.on('ask-now', (_e, payload) => cb(payload)),

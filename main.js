@@ -245,7 +245,7 @@ ipcMain.on('region-selected', async (event, rect) => {
     await captureRegion(display, rect);
   } catch (err) {
     console.error('Region capture failed:', err);
-    sendToOverlay('solve-error', { error: String(err.message || err) });
+    sendToOverlay('capture-error', { error: 'Region capture failed: ' + String(err.message || err) });
   }
 });
 
@@ -265,11 +265,20 @@ function routeCapture(dataUrl, sourceType) {
   return deliverVisionCapture(dataUrl, sourceType);
 }
 // Vision mode: hand the image to the renderer, which shows the send popup.
-// Main only un-hides the window; the renderer owns dot/expanded state and
-// expands itself (avoids a double-resize race).
+// Main only un-hides the window.
 function deliverVisionCapture(dataUrl, sourceType) {
-  if (!overlayWindow || overlayWindow.isDestroyed()) return;
-  if (!overlayWindow.isVisible()) overlayWindow.show();
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    console.error('[capture] overlay window is gone; capture dropped');
+    return;
+  }
+  // Show AND raise the overlay: a window that is visible but sitting behind the
+  // active app looks exactly like "the editor did not open". showInactive()
+  // raises it without stealing keyboard focus from the meeting app (the
+  // editor's own focus handling takes over once the user clicks into it).
+  if (overlayWindow.isMinimized()) overlayWindow.restore();
+  if (!overlayWindow.isVisible()) overlayWindow.showInactive();
+  overlayWindow.moveTop();
+  console.log(`[capture] delivering ${sourceType} (${Math.round(dataUrl.length / 1024)} KB) to the overlay`);
   sendToOverlay('vision-capture', { dataUrl, sourceType });
 }
 // [OCR-DISABLED] // Controller of the in-flight local-OCR request (null when idle). Cancelling
@@ -331,28 +340,6 @@ ipcMain.on('save-transcript', (event, { speaker, text }) => {
   fs.appendFile(logFilePath, logLine, (err) => {
     if (err) console.error('Failed to write transcript:', err);
   });
-});
-
-// Remember the expanded size so we can restore it after the floating-dot state.
-let expandedBounds = null;
-let overlayDot = false;   // true while minimized to the floating dot
-
-ipcMain.on('toggle-overlay-mode', (event, isMinimized) => {
-  if (!overlayWindow) return;
-  if (isMinimized) {
-    // Save current (expanded) size, then shrink to the dot.
-    expandedBounds = overlayWindow.getBounds();
-    overlayDot = true;
-    dragState = null;
-    resizeState = null;
-    overlayWindow.setSize(64, 64);
-  } else {
-    overlayDot = false;
-    // Restore the previous expanded size (fallback to a sensible default).
-    const w = (expandedBounds && expandedBounds.width) || 1000;
-    const h = (expandedBounds && expandedBounds.height) || 720;
-    overlayWindow.setSize(w, h);
-  }
 });
 
 // Resolve interviewer-capture VAD timings from env + overlay.config.json and
@@ -425,7 +412,7 @@ ipcMain.on('overlay-drag-end', (event) => {
 let resizeState = null;
 
 ipcMain.on('overlay-resize-start', (event) => {
-  if (!isOverlaySender(event) || overlayCompact || overlayDot) return;
+  if (!isOverlaySender(event) || overlayCompact) return;
   const bounds = overlayWindow.getBounds();
   resizeState = {
     cursor: screen.getCursorScreenPoint(),
@@ -456,8 +443,7 @@ ipcMain.on('overlay-resize-end', (event) => {
 // "Pop out" shrinks THIS window (same renderer, same content protection, still
 // always-on-top) to a small panel in the top-right of the current display, so
 // the rest of the screen is free for typing the solution elsewhere. Turning it
-// off restores the exact previous bounds. Kept separate from the dot's
-// expandedBounds so the two features never overwrite each other's state.
+// off restores the exact previous bounds.
 const COMPACT_W = 460;
 const COMPACT_H = 380;
 let preCompactBounds = null;
@@ -511,7 +497,7 @@ ipcMain.on('set-tone', (event, tone) => {
 function triggerFullCapture() {
   captureFullScreen().catch((err) => {
     console.error('Full capture failed:', err);
-    sendToOverlay('solve-error', { error: String(err.message || err) });
+    sendToOverlay('capture-error', { error: 'Screen capture failed: ' + String(err.message || err) });
   });
 }
 function triggerRegionCapture() {
@@ -525,9 +511,33 @@ ipcMain.on('trigger-capture', (event, kind) => {
   else if (kind === 'region') triggerRegionCapture();
 });
 
+// Renderer-side capture diagnostics, printed in the terminal running `npm start`
+// so the whole capture chain can be followed in one place.
+ipcMain.on('capture-log', (event, msg) => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  if (BrowserWindow.fromWebContents(event.sender) !== overlayWindow) return;
+  console.log('[capture][overlay] ' + String(msg).slice(0, 500));
+});
+
+// Register a global hotkey and REPORT the result: register() returns false when
+// macOS/another app already owns the combination, and the hotkey then silently
+// does nothing. Failures are logged and surfaced in the overlay status bar.
+const hotkeyFailures = [];
+function registerHotkey(accelerator, handler, label) {
+  let ok = false;
+  try { ok = globalShortcut.register(accelerator, handler); } catch (err) { ok = false; }
+  if (!ok) {
+    hotkeyFailures.push(`${label} (${accelerator})`);
+    console.error(`[hotkey] could not register ${label} ${accelerator} - it is used by macOS or another app`);
+  } else {
+    console.log(`[hotkey] registered ${label} ${accelerator}`);
+  }
+  return ok;
+}
+
 function registerShortcuts() {
-  globalShortcut.register(HOTKEY_CAPTURE_FULL, triggerFullCapture);
-  globalShortcut.register(HOTKEY_CAPTURE_REGION, triggerRegionCapture);
+  registerHotkey(HOTKEY_CAPTURE_FULL, () => { console.log('[capture] full-screen hotkey pressed'); triggerFullCapture(); }, 'full-screen capture');
+  registerHotkey(HOTKEY_CAPTURE_REGION, () => { console.log('[capture] region hotkey pressed'); triggerRegionCapture(); }, 'region capture');
 
   globalShortcut.register(HOTKEY_TOGGLE_OVERLAY, () => {
     if (!overlayWindow) return;
@@ -594,6 +604,16 @@ app.whenReady().then(() => {
   configureMediaPermissions();
   createOverlayWindow();
   registerShortcuts();
+  // Tell the overlay (once it has loaded) if a capture hotkey could not be registered.
+  if (hotkeyFailures.length && overlayWindow) {
+    overlayWindow.webContents.once('did-finish-load', () => {
+      sendToOverlay('capture-error', {
+        error: 'Hotkey not available: ' + hotkeyFailures.join(', ')
+          + '. Use the Capture buttons in the Answer tab, or set a different key '
+          + '(HOTKEY_CAPTURE_FULL / HOTKEY_CAPTURE_REGION).',
+      });
+    });
+  }
 });
 
 // Graceful shutdown: give the overlay renderer a chance to stop audio capture,

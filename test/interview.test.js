@@ -12,6 +12,7 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 const VisionBatch = require('../vision-batch.js');
+const CaptureFlow = require('../capture-flow.js');
 const UxHelpers = require('../ux-helpers.js');
 
 function loadInterviewModule() {
@@ -421,6 +422,176 @@ test('UxHelpers: isCancelled', () => {
   assert.strictEqual(UxHelpers.isCancelled({}), false);
   assert.strictEqual(UxHelpers.isCancelled({ cancelled: true }), true);
 });
+
+// ── CaptureFlow (capture opens the edit screen directly) ─────────────────
+const CF = CaptureFlow;
+const cap = (n, t) => ({ dataUrl: 'data:image/png;base64,' + n, sourceType: t });
+const FULL_MSG = 'Batch limit reached (6 images). Send or remove one.';
+function freshWith(nStaged, extra) {
+  const staged = [];
+  for (let i = 0; i < nStaged; i++) staged.push({ id: 's' + i, dataUrl: 'd' + i, sourceType: 'screenshot-full' });
+  return Object.assign({ mode: 'fresh', staged, current: { dataUrl: 'cur', sourceType: 'screenshot-region' }, busy: false, sent: false }, extra || {});
+}
+test('CaptureFlow: createState defaults', () => {
+  assert.deepStrictEqual(CF.createState(), { mode: 'closed', staged: [], current: null, busy: false, sent: false });
+});
+test('CaptureFlow: closed + capture -> open-fresh, default sourceType, staged kept', () => {
+  const st = Object.assign(CF.createState(), { staged: [{ id: 'a', dataUrl: 'x', sourceType: 'screenshot-full' }] });
+  const r = CF.onCapture(st, { dataUrl: 'data:img' });
+  assert.strictEqual(r.action, 'open-fresh');
+  assert.strictEqual(r.state.mode, 'fresh');
+  assert.deepStrictEqual(r.state.current, { dataUrl: 'data:img', sourceType: 'screenshot-full' });
+  assert.strictEqual(r.state.staged.length, 1);
+  assert.strictEqual(CF.onCapture(CF.createState(), cap('a', 'screenshot-region')).state.current.sourceType, 'screenshot-region');
+});
+test('CaptureFlow: closed with 5 staged opens, with 6 staged is full', () => {
+  const five = Object.assign(CF.createState(), { staged: freshWith(5).staged });
+  assert.strictEqual(CF.onCapture(five, cap('a')).action, 'open-fresh');
+  const six = Object.assign(CF.createState(), { staged: freshWith(6).staged });
+  const r = CF.onCapture(six, cap('a'));
+  assert.strictEqual(r.action, 'full');
+  assert.strictEqual(r.message, FULL_MSG);
+  assert.strictEqual(r.state, six);
+});
+test('CaptureFlow: fresh idle -> stage-and-replace, then stageCurrent+loadCurrent', () => {
+  const st = freshWith(1);
+  const r = CF.onCapture(st, cap('new', 'screenshot-region'));
+  assert.strictEqual(r.action, 'stage-and-replace');
+  assert.strictEqual(r.state, st);
+  assert.strictEqual(r.stageCurrent, true);
+  const s = CF.stageCurrent(st, 'edited', 'screenshot-region');
+  assert.strictEqual(s.added, true);
+  const next = CF.loadCurrent(s.state, r.pendingCurrent);
+  assert.deepStrictEqual(next.staged.map((x) => x.dataUrl), ['d0', 'edited']);
+  assert.strictEqual(next.current.dataUrl, cap('new').dataUrl);
+});
+test('CaptureFlow: fresh idle cap: 4 staged ok, 5 staged is full (nothing dropped)', () => {
+  assert.strictEqual(CF.onCapture(freshWith(4), cap('n')).action, 'stage-and-replace');
+  const st = freshWith(5);
+  const r = CF.onCapture(st, cap('n'));
+  assert.strictEqual(r.action, 'full');
+  assert.strictEqual(r.message, FULL_MSG);
+  assert.strictEqual(r.state, st);
+  assert.strictEqual(st.staged.length, 5);
+});
+test('CaptureFlow: fresh busy -> defer, state unchanged', () => {
+  const st = freshWith(1, { busy: true });
+  const r = CF.onCapture(st, cap('n'));
+  assert.strictEqual(r.action, 'defer');
+  assert.strictEqual(r.state, st);
+});
+test('CaptureFlow: fresh sent -> replace-sent, no staging', () => {
+  const st = freshWith(0, { sent: true });
+  const r = CF.onCapture(st, cap('n'));
+  assert.strictEqual(r.action, 'replace-sent');
+  assert.strictEqual(r.state.sent, false);
+  assert.strictEqual(r.state.staged.length, 0);
+  assert.strictEqual(r.state.current.dataUrl, cap('n').dataUrl);
+});
+test('CaptureFlow: record -> replace-record resets staged', () => {
+  const st = { mode: 'record', staged: [], current: null, busy: false, sent: false };
+  const r = CF.onCapture(st, cap('n', 'screenshot-region'));
+  assert.strictEqual(r.action, 'replace-record');
+  assert.strictEqual(r.state.mode, 'fresh');
+  assert.deepStrictEqual(r.state.staged, []);
+  assert.strictEqual(r.state.current.sourceType, 'screenshot-region');
+});
+test('CaptureFlow: invalid payloads are ignored', () => {
+  [null, undefined, {}, { dataUrl: '' }, { dataUrl: 5 }].forEach((p) => {
+    assert.strictEqual(CF.onCapture(CF.createState(), p).action, 'ignore');
+  });
+});
+test('CaptureFlow: canStage conditions', () => {
+  assert.strictEqual(CF.canStage(freshWith(0)), true);
+  assert.strictEqual(CF.canStage(freshWith(4)), true);
+  assert.strictEqual(CF.canStage(freshWith(5)), false);
+  assert.strictEqual(CF.canStage(freshWith(0, { busy: true })), false);
+  assert.strictEqual(CF.canStage(freshWith(0, { sent: true })), false);
+  assert.strictEqual(CF.canStage(freshWith(0, { current: null })), false);
+  assert.strictEqual(CF.canStage(freshWith(0, { mode: 'record' })), false);
+  assert.strictEqual(CF.canStage(CF.createState()), false);
+  assert.strictEqual(CF.canStage(freshWith(1), 3), true);
+  assert.strictEqual(CF.canStage(freshWith(2), 3), false);
+});
+test('CaptureFlow: stageCurrent immutable, unique ids, capped, keeps current', () => {
+  const st = freshWith(0);
+  const a = CF.stageCurrent(st, 'e1', 'screenshot-full');
+  const b = CF.stageCurrent(a.state, 'e2', 'screenshot-full');
+  assert.strictEqual(st.staged.length, 0);
+  assert.notStrictEqual(a.state.staged[0].id, b.state.staged[1].id);
+  assert.strictEqual(b.state.current, st.current);
+  const capped = CF.stageCurrent(freshWith(5), 'e', 'screenshot-full');
+  assert.strictEqual(capped.added, false);
+  assert.strictEqual(capped.capped, true);
+  assert.strictEqual(capped.state.staged.length, 5);
+});
+test('CaptureFlow: removeStaged by id; unknown id no-op', () => {
+  const st = freshWith(3);
+  assert.deepStrictEqual(CF.removeStaged(st, 's1').staged.map((x) => x.id), ['s0', 's2']);
+  assert.deepStrictEqual(CF.removeStaged(st, 'nope').staged.length, 3);
+});
+test('CaptureFlow: closeKeepStaged keeps staged; discard clears everything', () => {
+  const st = freshWith(2, { sent: true });
+  const k = CF.closeKeepStaged(st);
+  assert.strictEqual(k.mode, 'closed');
+  assert.strictEqual(k.staged.length, 2);
+  assert.strictEqual(k.current, null);
+  assert.strictEqual(k.sent, false);
+  assert.deepStrictEqual(CF.discard(st), CF.createState());
+});
+test('CaptureFlow: imagesToSend order, parallel source_types, cap, empty', () => {
+  const st = freshWith(2);
+  st.staged[1].sourceType = 'screenshot-region';
+  const r = CF.imagesToSend(st, 'EDITED');
+  assert.strictEqual(r.ok, true);
+  assert.deepStrictEqual(r.images, ['d0', 'd1', 'EDITED']);
+  assert.deepStrictEqual(r.source_types, ['screenshot-full', 'screenshot-region', 'screenshot-region']);
+  assert.strictEqual(r.count, 3);
+  assert.strictEqual(CF.imagesToSend(freshWith(0), 'E').images.length, 1);
+  assert.strictEqual(CF.imagesToSend(st, '').ok, false);
+  const over = CF.imagesToSend(freshWith(6), 'E');
+  assert.strictEqual(over.ok, false);
+  assert.strictEqual(over.images.length, 0);
+});
+test('CaptureFlow: markSent clears staged, keeps current and fresh mode', () => {
+  const st = freshWith(2, { busy: true });
+  const m = CF.markSent(st);
+  assert.deepStrictEqual(m.staged, []);
+  assert.strictEqual(m.sent, true);
+  assert.strictEqual(m.busy, false);
+  assert.strictEqual(m.mode, 'fresh');
+  assert.strictEqual(m.current, st.current);
+});
+test('CaptureFlow: normalizeLastMode', () => {
+  assert.strictEqual(CF.normalizeLastMode('scenario'), 'scenario');
+  ['coding', '', null, undefined, 'x', 5].forEach((v) => assert.strictEqual(CF.normalizeLastMode(v), 'coding'));
+});
+test('CaptureFlow: labels', () => {
+  assert.strictEqual(CF.sendLabel(1), 'Get solution from image');
+  assert.strictEqual(CF.sendLabel(3), 'Get solution (3 images)');
+  assert.strictEqual(CF.countLabel(freshWith(2)), '2 staged + current (3 of 6)');
+});
+test('index.html: capture-flow wired, popup retired', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const vb = html.indexOf('<script src="vision-batch.js"></script>');
+  const cf = html.indexOf('<script src="capture-flow.js"></script>');
+  assert.ok(vb > 0 && cf > vb);
+  assert.strictEqual(html.split('<script src="capture-flow.js">').length - 1, 1);
+  ['edit-stage', 'edit-stage-strip', 'edit-stage-count', 'edit-add-shot'].forEach((id) => {
+    assert.strictEqual(html.split('id="' + id + '"').length - 1, 1, id);
+  });
+  const tag = html.match(/<button[^>]*id="edit-add-shot"[^>]*>/)[0];
+  assert.ok(!/\btitle=/.test(tag));
+  const active = html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+  ['vision-popup', 'vp-send', '(^|[^-\\w])vm-coding', "getElementById\\('vp-", "\\$\\('vp-", 'name="vision-mode"'].forEach((t) => {
+    assert.ok(!new RegExp(t).test(active), 'active reference remains: ' + t);
+  });
+  assert.ok(html.split('[VISION-POPUP-DISABLED]').length - 1 >= 3);
+});
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) {
   for (const f of failures) console.log('FAILED: ' + f.name + '\n' + (f.e.stack || f.e.message) + '\n');
