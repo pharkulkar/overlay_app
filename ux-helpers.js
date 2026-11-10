@@ -47,9 +47,23 @@
     }
     return 'Something went wrong. Please try again.';
   }
+  function normalizeOpacity(v) { return v === 'dim' || v === 'solid' ? v : 'glass'; }
+  // macOS media-access status -> one short first-run checklist line.
+  function describePermission(kind, status) {
+    const name = kind === 'microphone' ? 'Microphone' : 'Screen Recording';
+    if (status === 'granted') return { ok: true, text: name + ': OK' };
+    if (status === 'not-required') return { ok: true, text: name + ': OK (not required)' };
+    if (status === 'not-determined') {
+      return { ok: false, text: kind === 'microphone'
+        ? 'Microphone: not asked yet - allowed on first use'
+        : 'Screen Recording: not asked yet - System Settings > Privacy' };
+    }
+    return { ok: false, text: name + ': not allowed - System Settings > Privacy' };
+  }
   const api = {
     POLL_INTERVAL_MS, recordSignature, recordsSignature, newestSignature,
     galleryChanged, shouldPoll, newRequestId, isCancelled, formatAccelerator, friendlyError,
+    normalizeOpacity, describePermission,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else window.UxHelpers = api;

@@ -1,5 +1,5 @@
 const {
-  app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, session,
+  app, BrowserWindow, ipcMain, screen, globalShortcut, desktopCapturer, session, systemPreferences,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -22,13 +22,11 @@ const BACKEND_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 const HOTKEY_CAPTURE_FULL = process.env.HOTKEY_CAPTURE_FULL || 'CommandOrControl+Shift+1';
 const HOTKEY_CAPTURE_REGION = process.env.HOTKEY_CAPTURE_REGION || 'CommandOrControl+Shift+2';
 const HOTKEY_TOGGLE_OVERLAY = process.env.HOTKEY_TOGGLE_OVERLAY || 'CommandOrControl+Shift+H';
-const HOTKEY_ASK_NOW = process.env.HOTKEY_ASK_NOW || 'CommandOrControl+Shift+A';
+// [AUDIO-TAB-DISABLED] const HOTKEY_ASK_NOW = process.env.HOTKEY_ASK_NOW || 'CommandOrControl+Shift+A';
 
 let overlayWindow;
 let selectionWindow;
 
-// Current answer tone (set by the overlay UI; applied to captures).
-let currentTone = process.env.ANSWER_TONE || 'concise';
 // Capture mode is permanently 'vision' (send image to OpenAI via the popup).
 // [OCR-DISABLED] was: // Capture mode: 'ocr' (default, local OCR) | 'vision' (send image to OpenAI).
 // [OCR-DISABLED] was: let captureMode = 'ocr';
@@ -374,9 +372,17 @@ ipcMain.on('get-vad-config', (event) => {
 ipcMain.on('get-hotkeys', (event) => {
   event.returnValue = {
     capture: HOTKEY_CAPTURE_FULL, region: HOTKEY_CAPTURE_REGION,
-    toggle: HOTKEY_TOGGLE_OVERLAY, ask: HOTKEY_ASK_NOW,
+    toggle: HOTKEY_TOGGLE_OVERLAY, // [AUDIO-TAB-DISABLED] ask: HOTKEY_ASK_NOW,
   };
 });
+
+// Read-only permission status for the first-run checklist (never prompts).
+ipcMain.handle('get-permissions', () => (process.platform === 'darwin'
+  ? {
+    microphone: systemPreferences.getMediaAccessStatus('microphone'),
+    screen: systemPreferences.getMediaAccessStatus('screen'),
+  }
+  : { microphone: 'not-required', screen: 'not-required' }));
 
 // ── Drag the window from anywhere ────────────────────────────────────────────
 // Electron's native -webkit-app-region drag only covers whatever is NOT marked
@@ -482,10 +488,6 @@ ipcMain.on('set-compact-mode', (event, on) => {
   }
 });
 
-// Overlay UI sets the active answer tone; applied to hotkey captures.
-ipcMain.on('set-tone', (event, tone) => {
-  if (typeof tone === 'string' && tone) currentTone = tone;
-});
 
 // [OCR-DISABLED] // Overlay UI sets the capture mode ('ocr' | 'vision'); anything else ignored.
 // [OCR-DISABLED] ipcMain.on('set-capture-mode', (event, mode) => {
@@ -553,11 +555,11 @@ function registerShortcuts() {
     else { overlayWindow.showInactive(); overlayWindow.moveTop(); }
   }, 'hide/show');
 
-  // Ask-now: tell the overlay to request a suggestion over its open WebSocket.
-  registerHotkey(HOTKEY_ASK_NOW, () => {
-    if (overlayWindow && !overlayWindow.isVisible()) { overlayWindow.showInactive(); overlayWindow.moveTop(); }
-    sendToOverlay('ask-now', {});
-  }, 'ask now');
+  // [AUDIO-TAB-DISABLED] Ask-now: tell the overlay to request a suggestion over its open WebSocket.
+  // [AUDIO-TAB-DISABLED] registerHotkey(HOTKEY_ASK_NOW, () => {
+  // [AUDIO-TAB-DISABLED]   if (overlayWindow && !overlayWindow.isVisible()) { overlayWindow.showInactive(); overlayWindow.moveTop(); }
+  // [AUDIO-TAB-DISABLED]   sendToOverlay('ask-now', {});
+  // [AUDIO-TAB-DISABLED] }, 'ask now');
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────

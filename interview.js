@@ -113,7 +113,6 @@
     languages: ['en'],    // selected language set (base codes)
     roman: true,          // "Show everything in English letters" (default ON)
     speechLocale: null,   // e.g. 'en-IN' (informational)
-    tone: null,
     backendUrl: null,
     candidateProfile: null,
 
@@ -609,7 +608,7 @@
     },
 
     // Start Listening to the interviewer. opts: {
-    //   backendUrl, tone, candidateProfile, language, languages, roman (default true),
+    //   backendUrl, candidateProfile, language, languages, roman (default true),
     //   onPhase,onLevel,onTranscript,onQuestionDetected,onAnswerStarted,
     //   onAnswerChunk,onAnswerCompleted,onQuestionCancelled,onError,
     //   onConnection,onSessionStarted,onDevicesChanged
@@ -622,7 +621,6 @@
       applyVadConfig(opts.vadConfig);
 
       state.backendUrl = opts.backendUrl || null;
-      state.tone = opts.tone || null;
       state.candidateProfile = opts.candidateProfile || null;
       state.languages = (Array.isArray(opts.languages) && opts.languages.length)
         ? opts.languages.slice()
@@ -713,7 +711,6 @@
     // Cancel the in-flight question's generation (maps to backend 'cancel').
     cancelCurrent() { return ivSend({ type: 'cancel' }); },
 
-    setTone(tone) { state.tone = tone || null; },
 
     // Language set + candidate-profile accessors (pure state; applied on the
     // NEXT start()/start-frame — a changed set never mutates a live session).

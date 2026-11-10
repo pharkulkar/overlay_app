@@ -438,7 +438,7 @@ test('self-test: missing global cursor rule is reported (both files)', () => {
 test('self-test: cursor:pointer in CSS / inline style / cssText / style.cursor is reported', () => {
   assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('.hidden { display: none !important; }', '.hidden { display: none !important; } .x { cursor: pointer; }'); })).includes('cursor-css'));
   assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('id="ocr-input"', 'id="ocr-input" style="cursor:pointer"'); })).includes('cursor-inline'));
-  assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace("row.style.cssText = '", "row.style.cssText = 'cursor:pointer;"); })).includes('cursor-js-string'));
+  assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('const api = window.electronAPI || {};', "const api = window.electronAPI || {}; document.body.style.cssText = 'cursor:pointer;';"); })).includes('cursor-js-string'));
   assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('const api = window.electronAPI || {};', 'const api = window.electronAPI || {}; document.body.style.cursor = "wait";'); })).includes('cursor-assign'));
   assert.ok(rules(mutate((f) => { f.selectionHtml = f.selectionHtml.replace('user-select: none;', 'user-select: none; cursor: crosshair;'); })).includes('cursor-css'));
 });
@@ -451,7 +451,7 @@ test('self-test: title= attribute / .title = / setAttribute("title") are reporte
   assert.deepStrictEqual(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('const api = window.electronAPI || {};', 'const api = window.electronAPI || {}; // el.title = "x"'); })), []);
 });
 test('self-test: a native <select> (unmarked or created in JS) is reported', () => {
-  assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace(' data-sd-select', ''); })).includes('select-native'));
+  assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('<textarea id="ocr-input"', '<select id="x"></select><textarea id="ocr-input"'); })).includes('select-native'));
   assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('const api = window.electronAPI || {};', 'const api = window.electronAPI || {}; document.createElement("select");'); })).includes('select-created'));
 });
 test('self-test: confirm( / alert( / prompt( are reported; overlayConfirm( and comments are not', () => {

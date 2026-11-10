@@ -594,12 +594,35 @@ test('index.html: capture-flow wired, popup retired', () => {
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
-  ['vision-popup', 'vp-send', '(^|[^-\\w])vm-coding', "getElementById\\('vp-", "\\$\\('vp-", 'name="vision-mode"'].forEach((t) => {
+  ['vision-popup', 'vp-send', '(^|[^-\\w])vm-coding', "getElementById\\('vp-", "\\$\\('vp-", 'name="vision-mode"', 'id="nav-audio"', 'id="view-audio"', 'AudioCapture'].forEach((t) => {
     assert.ok(!new RegExp(t).test(active), 'active reference remains: ' + t);
   });
   assert.ok(html.split('[VISION-POPUP-DISABLED]').length - 1 >= 3);
+  assert.ok(html.split('[AUDIO-TAB-DISABLED]').length - 1 >= 3);
 });
 
+test('UxHelpers: normalizeOpacity and describePermission', () => {
+  assert.strictEqual(UxHelpers.normalizeOpacity('dim'), 'dim');
+  assert.strictEqual(UxHelpers.normalizeOpacity('solid'), 'solid');
+  assert.strictEqual(UxHelpers.normalizeOpacity('glass'), 'glass');
+  assert.strictEqual(UxHelpers.normalizeOpacity('bogus'), 'glass');
+  assert.strictEqual(UxHelpers.normalizeOpacity(null), 'glass');
+  assert.deepStrictEqual(UxHelpers.describePermission('microphone', 'granted'), { ok: true, text: 'Microphone: OK' });
+  assert.deepStrictEqual(UxHelpers.describePermission('screen', 'not-required'), { ok: true, text: 'Screen Recording: OK (not required)' });
+  assert.strictEqual(UxHelpers.describePermission('microphone', 'not-determined').ok, false);
+  assert.strictEqual(UxHelpers.describePermission('screen', 'denied').text, 'Screen Recording: not allowed - System Settings > Privacy');
+  assert.strictEqual(UxHelpers.describePermission('microphone', 'weird').text, 'Microphone: not allowed - System Settings > Privacy');
+});
+test('index.html: status line, tabs and single pause toggle contract', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const once = (s) => assert.strictEqual(html.split(s).length - 1, 1, s);
+  ['id="status-line"', 'id="iv-pause"', 'role="tablist"'].forEach(once);
+  assert.strictEqual(html.split('id="iv-resume"').length - 1, 0);
+  assert.strictEqual(html.split('role="tabpanel"').length - 1, 4);
+  assert.ok(/<div id="status-line"[^>]*aria-live="polite"/.test(html));
+  const bar = html.slice(html.indexOf('role="tablist"'));
+  assert.ok(/^[^>]*>\s*<button[^>]*id="nav-interview"[^>]*class="nav-btn active"|^[^>]*>\s*<button[^>]*class="nav-btn active"[^>]*id="nav-interview"/.test(bar));
+});
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');
 if (failed) {
   for (const f of failures) console.log('FAILED: ' + f.name + '\n' + (f.e.stack || f.e.message) + '\n');

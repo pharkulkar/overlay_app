@@ -68,6 +68,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const res = await fetch(`${BACKEND_URL}/api/health`);
     return res.json();
   },
+  getPermissions: () => ipcRenderer.invoke('get-permissions'),
 
   // Overlay controls
   saveTranscript: (speaker, text) => ipcRenderer.send('save-transcript', { speaker, text }),
@@ -76,8 +77,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendRegion: (rect) => ipcRenderer.send('region-selected', rect),
   cancelRegion: () => ipcRenderer.send('region-cancelled'),
 
-  // Overlay UI -> main: set the active answer tone (applied to hotkey captures)
-  setTone: (tone) => ipcRenderer.send('set-tone', tone),
 // [OCR-DISABLED]   setCaptureMode: (mode) => ipcRenderer.send('set-capture-mode', mode),
   // On-screen alternative to the capture hotkeys: kind = 'full' | 'region'.
   triggerCapture: (kind) => ipcRenderer.send('trigger-capture', kind),
@@ -103,8 +102,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Renderer -> main: write capture diagnostics into the terminal running `npm start`.
   logCapture: (msg) => ipcRenderer.send('capture-log', String(msg).slice(0, 500)),
 
-  // Main process -> overlay: ask-now hotkey pressed (request a suggestion)
-  onAskNow: (cb) => ipcRenderer.on('ask-now', (_e, payload) => cb(payload)),
+  // [AUDIO-TAB-DISABLED] Main process -> overlay: ask-now hotkey pressed (request a suggestion)
+  // [AUDIO-TAB-DISABLED] onAskNow: (cb) => ipcRenderer.on('ask-now', (_e, payload) => cb(payload)),
 
 // [OCR-DISABLED]   // Main process -> overlay: OCR text ready (editable before asking)
   // Main process -> overlay: a capture is ready for the vision send popup
@@ -121,8 +120,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Ask OpenAI with (possibly edited) text; optionally persist onto a record.
   // `language` (optional) pins the answer language; omitted when undefined so
   // the Answer tab's 3-arg calls stay byte-for-byte today's request.
-  askText: async (text, tone, recordId, language, requestId) => {
-    const body = { text, tone, record_id: recordId };
+  askText: async (text, recordId, language, requestId) => {
+    const body = { text, record_id: recordId };
     if (language) body.language = language;
     if (requestId) body.request_id = requestId;
     return trackedFetch(`${BACKEND_URL}/api/ask`, jsonPost(body), requestId);
@@ -142,9 +141,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // [OCR-DISABLED]   cancelOcr: () => ipcRenderer.send('cancel-ocr'),
 
   // Send one or more screenshots straight to OpenAI vision.
-  visionAsk: async (images, mode, tone, language, sourceTypes, requestId) => {
+  visionAsk: async (images, mode, language, sourceTypes, requestId) => {
     const body = { images, mode };
-    if (tone) body.tone = tone;
     if (language) body.language = language;
     if (Array.isArray(sourceTypes)) body.source_types = sourceTypes;
     if (requestId) body.request_id = requestId;

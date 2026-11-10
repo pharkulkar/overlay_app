@@ -21,7 +21,6 @@
     onSuggestions: null,
     onStatus: null,
     autoSuggest: false,
-    tone: null,
   };
 
   // Length of each audio segment sent for transcription (ms).
@@ -206,7 +205,7 @@
           const dataUrl = await blobToDataUrl(blob);
           state.ws.send(JSON.stringify({
             speaker, audio: dataUrl, filename: `${speaker}.webm`,
-            auto_suggest: state.autoSuggest, tone: state.tone,
+            auto_suggest: state.autoSuggest,
           }));
         }
       };
@@ -249,7 +248,6 @@
       state.onSuggestions = opts.onSuggestions || null;
       state.onStatus = opts.onStatus || null;
       state.autoSuggest = !!opts.autoSuggest;
-      state.tone = opts.tone || null;
 
       // Open the WS first if transcription is requested.
       if (state.transcribe && opts.backendUrl) {
@@ -294,16 +292,15 @@
     },
 
     // Request an on-demand suggestion over the open WS (ask-now).
-    suggestNow(tone) {
+    suggestNow() {
       if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-        state.ws.send(JSON.stringify({ type: 'suggest_now', tone: tone || state.tone }));
+        state.ws.send(JSON.stringify({ type: 'suggest_now' }));
         return true;
       }
       return false;
     },
 
     setAutoSuggest(on) { state.autoSuggest = !!on; },
-    setTone(tone) { state.tone = tone || null; },
 
     // Expose raw streams for later phases.
     getStreams() {
