@@ -69,13 +69,18 @@
   }
   .icon-btn:hover { background: rgba(255,255,255,0.16); }
 
+  #hotkey-strip {
+    flex: none; font-size: 11px; color: #8d93a0; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
   /* ── Views ──────────────────────────────────────────────── */
   .view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
   .view.hidden { display: none !important; }
 
   .zone-label {
-    font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.08em; color: #7a7f88;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #aeb4bf;
   }
 
   /* Answer hero */
@@ -88,7 +93,7 @@
     font-size: 15px; line-height: 1.55; color: #f2f2f4;
     white-space: pre-wrap; word-break: break-word;
   }
-  .muted { color: #6a6f78; font-style: italic; }
+  .muted { color: #8d93a0; font-style: italic; }
 
   /* Editable OCR / question input */
   #ocr-input {
@@ -99,26 +104,26 @@
     outline: none;
   }
   #ocr-input:focus { border-color: rgba(76,154,255,0.6); }
-  #ocr-input::placeholder { color: #6a6f78; }
+  #ocr-input::placeholder { color: #8d93a0; }
   #ocr-input.collapsed { display: none; }
 
   /* Actions row */
   .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .act-btn {
     border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.08);
-    color: #e8e8ea; font-size: 11px; padding: 5px 10px; border-radius: 7px;
+    color: #e8e8ea; font-size: 12px; padding: 5px 10px; border-radius: 7px;
   }
   .act-btn:hover { background: rgba(255,255,255,0.16); }
   select.tone {
     background: #1c1c24; color: #e8e8ea; border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 7px; font-size: 11px; padding: 4px 6px;
+    border-radius: 7px; font-size: 12px; padding: 4px 6px;
   }
 
   /* Gallery */
   #gallery-grid { flex: 1; min-height: 0; overflow-y: auto;
     background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06);
     border-radius: 10px; padding: 10px; }
-  .day-head { font-size: 10px; color: #6a6f78; text-transform: uppercase;
+  .day-head { font-size: 11px; color: #8d93a0; text-transform: uppercase;
     letter-spacing: 0.08em; margin: 10px 0 6px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
   .g-item { position: relative; border: 1px solid rgba(255,255,255,0.1);
@@ -126,17 +131,17 @@
   .g-item:hover { border-color: rgba(255,255,255,0.3); }
   .g-item img { width: 100%; height: 58px; object-fit: cover; display: block; }
   .g-audio { width: 100%; height: 58px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-  .g-text { width: 100%; height: 58px; padding: 6px 7px; font-size: 10px; line-height: 1.3;
+  .g-text { width: 100%; height: 58px; padding: 6px 7px; font-size: 11px; line-height: 1.3;
     color: #cfd6e2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4;
     -webkit-box-orient: vertical; }
   .g-badge { position: absolute; top: 3px; left: 3px; font-size: 11px;
     background: rgba(0,0,0,0.65); border-radius: 4px; padding: 0 4px; }
-  .g-del { position: absolute; top: 3px; right: 3px; font-size: 11px; color: #fff;
+  .g-del { position: absolute; top: 3px; right: 3px; font-size: 12px; color: #fff;
     background: rgba(163,21,21,0.8); border-radius: 4px; padding: 0 5px; }
 
   /* Audio capture meters */
   #view-audio .pad { flex: 1; display: flex; align-items: center; justify-content: center;
-    color: #6a6f78; font-size: 13px; text-align: center; line-height: 1.6; }
+    color: #8d93a0; font-size: 13px; text-align: center; line-height: 1.6; }
   .meter { width: 100%; height: 10px; background: rgba(255,255,255,0.08);
     border-radius: 6px; overflow: hidden; }
   .meter-fill { height: 100%; width: 0%; background: #4cd964; border-radius: 6px;
@@ -205,19 +210,19 @@
   }
   .iv-langs-list label {
     display: flex; align-items: center; gap: 6px; padding: 3px 4px;
-    font-size: 11px; color: #d6d9df; white-space: nowrap;
+    font-size: 12px; color: #d6d9df; white-space: nowrap;
   }
   .iv-langs-list label:hover { background: rgba(255,255,255,0.06); border-radius: 4px; }
   .iv-langs-list input { margin: 0; }
-  .iv-roman { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #d6d9df; white-space: nowrap; user-select: none; }
+  .iv-roman { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #d6d9df; white-space: nowrap; user-select: none; }
   .iv-roman input { margin: 0; }
   .qa-lang-badge {
     display: inline-block; margin-left: 6px; padding: 0 5px;
-    font-size: 9px; line-height: 15px; border-radius: 4px;
+    font-size: 11px; line-height: 15px; border-radius: 4px;
     background: rgba(76,154,255,0.18); color: #9ec1ff; text-transform: uppercase;
   }
 
-  .iv-meta { font-size: 10px; color: #7a7f88; display: inline-flex; align-items: center; gap: 4px; }
+  .iv-meta { font-size: 11px; color: #aeb4bf; display: inline-flex; align-items: center; gap: 4px; }
   .iv-conn-ok { color: #4cd964; }
   .iv-conn-bad { color: #ff3b30; }
   .iv-conn-warn { color: #ffb020; }
@@ -246,11 +251,11 @@
   .qa-card.current { border-color: rgba(76,154,255,0.45); background: rgba(76,154,255,0.06); }
   .qa-q { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.45; display: flex; gap: 6px; }
   .qa-q .q-mark { color: #4c9aff; flex-shrink: 0; }
-  .qa-badge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  .qa-badge { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
     padding: 1px 6px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
   .qa-badge.followup { background: rgba(255,176,32,0.18); color: #ffb020; }
   .qa-badge.manual { background: rgba(154,159,168,0.18); color: #cfd6e2; }
-  .qa-genline { font-size: 10px; color: #4c9aff; margin: 6px 0 4px; display: flex; align-items: center; gap: 6px; }
+  .qa-genline { font-size: 11px; color: #4c9aff; margin: 6px 0 4px; display: flex; align-items: center; gap: 6px; }
   .qa-genline .spin { width: 9px; height: 9px; border-radius: 50%;
     border: 2px solid rgba(76,154,255,0.3); border-top-color: #4c9aff; animation: ivspin 0.7s linear infinite; }
   @keyframes ivspin { to { transform: rotate(360deg); } }
@@ -263,21 +268,23 @@
   @media (prefers-reduced-motion: reduce) {
     .loader-spinner { animation: none; border-style: dashed; border-color: #4c9aff; }
   }
-  .loader .act-btn { padding: 2px 8px; font-size: 11px; }
+  .loader .act-btn { padding: 2px 8px; font-size: 12px; }
   .qa-a { font-size: 13px; line-height: 1.55; color: #f2f2f4; white-space: pre-wrap; word-break: break-word;
     margin-top: 4px; }
   .qa-a.collapsed { max-height: 72px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 60%, transparent); }
   .qa-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
   .qa-err { color: #ff3b30; font-size: 12px; margin-top: 6px; }
 
-  /* ── Gallery hover actions (Edit + Delete on every thumbnail) ────────── */
+  /* ── Gallery hover/focus actions (Edit + Delete on every thumbnail) ────────── */
   .g-actions {
     position: absolute; top: 3px; right: 3px; display: none; gap: 4px;
     z-index: 2;
   }
-  .g-item:hover .g-actions { display: flex; }
+  .g-item:hover .g-actions, .g-item:focus-within .g-actions { display: flex; }
+  .g-open { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; }
+  .g-open:focus-visible, .g-act:focus-visible { outline: 2px solid rgba(76,154,255,0.9); outline-offset: 1px; }
   .g-act {
-    font-size: 11px; line-height: 1; color: #fff;
+    font-size: 12px; line-height: 1; color: #fff;
     border: 1px solid rgba(255,255,255,0.18); border-radius: 4px; padding: 2px 5px;
     background: rgba(0,0,0,0.65);
   }
@@ -336,7 +343,7 @@
     border-radius: 10px; padding: 12px; font-size: 14px; line-height: 1.55;
     color: #f2f2f4; white-space: pre-wrap; word-break: break-word; min-height: 20px;
   }
-  #edit-status { font-size: 11px; color: #7a7f88; }
+  #edit-status { font-size: 11px; color: #aeb4bf; }
 
   /* ── Vision send popup ───────────────────── */
   /* [OCR-DISABLED] capture-mode settings popover CSS:
@@ -399,7 +406,7 @@
   .fs-rm {
     position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; padding: 0;
     border-radius: 50%; border: 0; background: rgba(163,21,21,0.95); color: #fff;
-    font-size: 10px; line-height: 18px; -webkit-app-region: no-drag;
+    font-size: 12px; line-height: 18px; -webkit-app-region: no-drag;
   }
   .fs-rm:disabled { opacity: 0.45; }
   #edit-add-shot:disabled, #edit-vision-send:disabled { opacity: 0.45; }
@@ -421,7 +428,7 @@
     user-select: text; -webkit-user-select: text;
   }
   .cv-text { white-space: pre-wrap; word-break: break-word; margin: 0 0 8px; }
-  .cv-lang { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #7a7f88; margin: 0 0 3px; }
+  .cv-lang { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #aeb4bf; margin: 0 0 3px; }
   .cv-code {
     margin: 0 0 8px; padding: 8px 10px; border-radius: 8px;
     background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.1);
@@ -462,7 +469,7 @@
     display: flex; align-items: center; justify-content: space-between; gap: 6px;
     width: 100%; text-align: left; font-family: inherit;
     background: #1c1c24; color: #e8e8ea; border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 7px; font-size: 11px; padding: 4px 6px; -webkit-app-region: no-drag;
+    border-radius: 7px; font-size: 12px; padding: 4px 6px; -webkit-app-region: no-drag;
   }
   .sd-trigger:disabled { opacity: 0.5; }
   .sd-trigger:focus-visible { outline: 2px solid rgba(76,154,255,0.9); outline-offset: 1px; }
@@ -475,7 +482,7 @@
   }
   #sd-list.show { display: block; }
   .sd-opt {
-    padding: 5px 8px; font-size: 11px; color: #e8e8ea; border-radius: 5px;
+    padding: 5px 8px; font-size: 12px; color: #e8e8ea; border-radius: 5px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .sd-opt.active { background: rgba(76,154,255,0.9); color: #fff; }
@@ -539,10 +546,10 @@
     <div class="zone-label interactive" id="input-toggle" style="display:flex; align-items:center; gap:6px;">
       <span id="input-caret">▾</span> Question (type, then Ask)
     </div>
-    <textarea id="ocr-input" class="interactive" placeholder="Type your question and press Ask, or use the Capture buttons below (or ⌘⇧1 full · ⌘⇧2 region) to send a screenshot to OpenAI."></textarea>
+    <textarea id="ocr-input" class="interactive"></textarea>
     <div class="actions interactive">
-      <button class="act-btn" id="btn-capture-full" data-tip="Capture the whole screen (same as ⌘⇧1)">🖥 Capture screen</button>
-      <button class="act-btn" id="btn-capture-region" data-tip="Drag to select an area (same as ⌘⇧2)">✂ Capture region</button>
+      <button class="act-btn" id="btn-capture-full">🖥 Capture screen</button>
+      <button class="act-btn" id="btn-capture-region">✂ Capture region</button>
       <button class="act-btn" id="btn-ask" data-tip="Ask OpenAI with the text above">➤ Ask</button>
       <button class="act-btn" id="btn-clear-input" data-tip="Clear the text box">Clear</button>
       <span class="spacer"></span>
@@ -596,7 +603,7 @@
       <span class="spacer"></span>
       <button class="act-btn" id="iv-clear" data-tip="Clear the transcript and all Q&amp;A cards">🗑 Clear</button>
     </div>
-    <div class="iv-meta interactive" id="iv-cv-hint" style="font-size:10px;">Tip: choose the file before you start sharing your screen - the system file picker can be visible to others.</div>
+    <div class="iv-meta interactive" id="iv-cv-hint" style="font-size:11px;">Tip: choose the file before you start sharing your screen - the system file picker can be visible to others.</div>
     <div id="iv-cv-paste" class="interactive hidden" style="display:flex; flex-direction:column; gap:6px;">
       <textarea id="iv-cv-text" rows="6" placeholder="Paste your resume text here" aria-label="Resume text"></textarea>
       <div class="actions">
@@ -626,7 +633,7 @@
     <div class="zone-label" style="margin-top:2px;">Questions &amp; answers</div>
     <div id="iv-qa" class="interactive"><span class="muted">Detected questions and their professional answers appear here automatically.</span></div>
 
-    <div class="iv-meta interactive" style="font-size:10px;">
+    <div class="iv-meta interactive" style="font-size:11px;">
       Listens to the interviewer via system audio (what plays through your speakers), not your microphone.
       For a manual question, use the <b>Answer</b> tab.
     </div>
@@ -648,14 +655,14 @@
     <!-- Compact capture controls -->
     <div class="actions interactive" style="flex-wrap:wrap;">
       <button class="act-btn" id="audio-toggle">● Start</button>
-      <label style="font-size:11px; color:#cfcfd4; display:flex; align-items:center; gap:5px;">
+      <label style="font-size:12px; color:#cfcfd4; display:flex; align-items:center; gap:5px;">
         <input type="checkbox" id="transcribe-toggle" checked /> Transcribe
       </label>
       <span class="meter mini"><span class="meter-fill" id="meter-me"></span></span>
       <span class="meter mini"><span class="meter-fill them" id="meter-them"></span></span>
       <span class="spacer"></span>
       <button class="act-btn" id="audio-devices-toggle" data-tip="Device settings" aria-label="Device settings">⚙︎</button>
-      <button class="act-btn" id="btn-ask-now" data-tip="Ask about the latest (⌘⇧A)">💡 Ask latest</button>
+      <button class="act-btn" id="btn-ask-now">💡 Ask latest</button>
     </div>
 
     <!-- Device settings (collapsed by default) -->
@@ -691,7 +698,7 @@
     <!-- Suggestions (demoted; auto off by default) -->
     <div style="display:flex; align-items:center; gap:8px;">
       <span class="zone-label">Suggestions</span>
-      <label style="font-size:11px; color:#cfcfd4; display:flex; align-items:center; gap:5px;" class="interactive">
+      <label style="font-size:12px; color:#cfcfd4; display:flex; align-items:center; gap:5px;" class="interactive">
         <input type="checkbox" id="auto-suggest-toggle" /> Auto on pause
       </label>
     </div>
@@ -701,6 +708,8 @@
       <span class="muted">Select transcript text → right-click → Ask, or press "Ask latest".</span>
     </div>
   </div>
+
+  <div id="hotkey-strip" class="interactive"></div>
 
   <!-- Resize grip (bottom-right). The window is resizable:false so the OS never draws
        edge-resize cursors; initWindowResize drives the resize through IPC instead. -->
@@ -766,7 +775,7 @@
             <span class="spacer"></span>
             <button class="act-btn" id="edit-vision-send" data-tip="Sends the image exactly as shown (with any crop or drawing) to OpenAI">🧠 Get solution from image</button>
           </div>
-          <div class="muted" style="font-size:10px; margin-top:4px;">The image leaves your machine only when you press this button.</div>
+          <div class="muted" style="font-size:11px; margin-top:4px;">The image leaves your machine only when you press this button.</div>
         </fieldset>
       </div>
 
@@ -1362,6 +1371,28 @@
   const historyCount = document.getElementById('history-count');
   const historyCaret = document.getElementById('history-caret');
 
+  // Platform-aware hotkey text (accelerators come from main.js, env overrides included).
+  const IS_MAC = /Mac/.test(navigator.platform || navigator.userAgent);
+  const hotkeyText = (name) => window.UxHelpers.formatAccelerator((api.hotkeys || {})[name], IS_MAC);
+  ocrInput.placeholder = 'Type your question and press Ask, or use the Capture buttons below (or '
+    + hotkeyText('capture') + ' full · ' + hotkeyText('region') + ' region) to send a screenshot to OpenAI.';
+  document.getElementById('btn-capture-full').dataset.tip = 'Capture the whole screen (same as ' + hotkeyText('capture') + ')';
+  document.getElementById('btn-capture-region').dataset.tip = 'Drag to select an area (same as ' + hotkeyText('region') + ')';
+  document.getElementById('btn-ask-now').dataset.tip = 'Ask about the latest (' + hotkeyText('ask') + ')';
+  document.getElementById('hotkey-strip').textContent = 'Capture ' + hotkeyText('capture') + ' · Region ' + hotkeyText('region')
+    + ' · Hide/Show ' + hotkeyText('toggle') + ' · Ask ' + hotkeyText('ask');
+
+  // Shared copy helper: copies text and, when a button is given, shows "Copied ✓" for ~1.2s.
+  function copyText(text, btn) {
+    return navigator.clipboard.writeText(text).then(() => {
+      if (!btn) return;
+      const label = btn.dataset.copyLabel || btn.textContent;
+      btn.dataset.copyLabel = label;
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.textContent = label; delete btn.dataset.copyLabel; }, 1200);
+    }).catch((err) => console.error('[copy] failed:', err));
+  }
+
   function esc(s) {
     return (s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
   }
@@ -1376,7 +1407,7 @@
     // Skip the first (latest) — it's already in the answer box.
     historyList.innerHTML = items.slice(1).map((h) => `
       <div style="border-left:2px solid rgba(255,255,255,0.15); padding-left:8px;">
-        <div style="font-size:10px; color:#7a7f88;">Q: ${esc(h.question).slice(0, 120)}</div>
+        <div style="font-size:11px; color:#aeb4bf;">Q: ${esc(h.question).slice(0, 120)}</div>
         <div style="font-size:12px; color:#cfd6e2; white-space:pre-wrap;">${esc(h.answer)}</div>
       </div>`).join('');
   }
@@ -1498,8 +1529,7 @@
         // The preload bridge did not load askText — this is NOT a backend
         // problem; the renderer's electronAPI is missing/partial.
         setStatus('Error', 'error');
-        answerBody.textContent = 'Internal: askText bridge unavailable (electronAPI not loaded). '
-          + 'backendUrl=' + (api.backendUrl || 'undefined');
+        answerBody.textContent = 'Something went wrong. Please restart the app.';
         console.error('[ask] api.askText is undefined; electronAPI keys =', Object.keys(api));
         return;
       }
@@ -1525,8 +1555,7 @@
       }
     } catch (err) {
       setStatus('Error', 'error');
-      answerBody.textContent = 'Ask request threw: ' + (err && err.message ? err.message : String(err))
-        + '  (backendUrl=' + (api.backendUrl || 'undefined') + ')';
+      answerBody.textContent = window.UxHelpers.friendlyError(err, api.backendUrl);
       console.error('[ask] fetch threw:', err);
     } finally {
       askBusy = false;
@@ -1629,7 +1658,7 @@
     });
   })();
 
-  // On-screen capture buttons: same paths as the ⌘⇧1 / ⌘⇧2 hotkeys; both open
+  // On-screen capture buttons: same paths as the capture hotkeys; both open
   // the edit screen directly. The overlay is content-protected, so it is not captured.
   ['full', 'region'].forEach((kind) => {
     const btn = document.getElementById('btn-capture-' + kind);
@@ -1662,7 +1691,7 @@
   // Copy the answer.
   document.getElementById('btn-copy').addEventListener('click', () => {
     const t = answerBody.textContent || '';
-    if (t) { navigator.clipboard.writeText(t); }
+    if (t) copyText(t, document.getElementById('btn-copy'));
   });
 
   // ── Capture lifecycle (from main via IPC) ───────────────
@@ -1723,8 +1752,7 @@
       if (silent) return;
       // The preload bridge is missing listRecords — electronAPI didn't load.
       // This is distinct from the backend being unreachable.
-      galleryGrid.innerHTML = '<span class="muted">electronAPI bridge not loaded '
-        + '(listRecords missing). Keys: ' + Object.keys(api).join(', ') + '</span>';
+      galleryGrid.innerHTML = '<span class="muted">Something went wrong. Please restart the app.</span>';
       console.error('[gallery] api.listRecords undefined; electronAPI keys =', Object.keys(api));
       return;
     }
@@ -1734,9 +1762,7 @@
     try { data = await api.listRecords(); }
     catch (err) {
       if (silent) { console.warn('[gallery] silent refresh failed:', err); return; }
-      galleryGrid.innerHTML = '<span class="muted">Could not reach backend: '
-        + (err && err.message ? err.message : String(err))
-        + ' (backendUrl=' + (api.backendUrl || 'undefined') + ')</span>';
+      galleryGrid.innerHTML = '<span class="muted">' + window.UxHelpers.friendlyError(err, api.backendUrl) + '</span>';
       console.error('[gallery] listRecords threw:', err);
       return;
     }
@@ -1754,7 +1780,8 @@
     lastNewestSig = window.UxHelpers ? window.UxHelpers.newestSignature(records) : null;
     const prevScroll = silent ? galleryGrid.scrollTop : 0;
     if (!records.length) {
-      galleryGrid.innerHTML = '<div class="muted">No captures yet. Use the Capture buttons in the Answer tab (or ⌘⇧1 / ⌘⇧2).</div>';
+      galleryGrid.innerHTML = '<div class="muted">No captures yet. Use the Capture buttons in the Answer tab (or '
+        + hotkeyText('capture') + ' / ' + hotkeyText('region') + ').</div>';
       return;
     }
     const groups = {};
@@ -1773,18 +1800,19 @@
           // Show the transcribed question text as the title (like manual
           // records), prefixed with the mic marker, instead of a bare icon.
           const snippet = esc(r.extracted_text || 'Voice question').slice(0, 60);
-          thumb = `<div class="g-text">🎙 ${snippet}</div>`;
+          thumb = `<span class="g-text">🎙 ${snippet}</span>`;
         } else if (r.source_type === 'manual') {
           const snippet = esc(r.extracted_text || 'Question').slice(0, 60);
-          thumb = `<div class="g-text">💬 ${snippet}</div>`;
+          thumb = `<span class="g-text">💬 ${snippet}</span>`;
         } else {
           thumb = `<img src="${api.backendUrl}/api/records/${r.id}/thumb" onerror="this.style.display='none'"/>`;
         }
-        html += `<div class="g-item" data-id="${r.id}" data-type="${r.source_type}">${thumb}
+        html += `<div class="g-item" data-id="${r.id}" data-type="${r.source_type}">
+          <button type="button" class="g-open" data-id="${r.id}" aria-label="Open capture">${thumb}</button>
           <span class="g-badge" style="color:${color}">${badge}</span>
           <div class="g-actions">
-            <span class="g-act edit" data-id="${r.id}" data-type="${r.source_type}" data-tip="Edit" aria-label="Edit">✏️</span>
-            <span class="g-act del" data-id="${r.id}" data-tip="Delete" aria-label="Delete">×</span>
+            <button type="button" class="g-act edit" data-id="${r.id}" data-type="${r.source_type}" data-tip="Edit" aria-label="Edit">✏️</button>
+            <button type="button" class="g-act del" data-id="${r.id}" data-tip="Delete" aria-label="Delete">×</button>
           </div></div>`;
       }
       html += '</div>';
@@ -1792,14 +1820,10 @@
     galleryGrid.innerHTML = html;
     if (silent) galleryGrid.scrollTop = prevScroll;
 
-    galleryGrid.querySelectorAll('.g-item').forEach((el) => {
-      el.addEventListener('click', (e) => {
-        // Hover-action buttons handle their own clicks.
-        if (e.target.closest('.g-actions')) return;
-        openRecord(el.getAttribute('data-id'));
-      });
+    galleryGrid.querySelectorAll('.g-open').forEach((el) => {
+      el.addEventListener('click', () => openRecord(el.getAttribute('data-id')));
     });
-    // Delete (unified hover action for ALL record types).
+    // Delete (unified hover/focus action for ALL record types).
     galleryGrid.querySelectorAll('.g-act.del').forEach((el) => {
       el.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -1808,7 +1832,7 @@
         loadGallery();
       });
     });
-    // Edit (hover action for ALL record types; routed by source_type).
+    // Edit (hover/focus action for ALL record types; routed by source_type).
     galleryGrid.querySelectorAll('.g-act.edit').forEach((el) => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1872,7 +1896,7 @@
     if (!api.getRecord) {
       console.warn('[openRecord] api.getRecord is undefined');
       setStatus('Error', 'error');
-      answerBody.textContent = 'Internal: getRecord unavailable.';
+      answerBody.textContent = 'Something went wrong. Please restart the app.';
       return;
     }
 
@@ -1883,7 +1907,7 @@
     } catch (err) {
       console.error('[openRecord] getRecord failed:', err);
       setStatus('Backend offline', 'error');
-      answerBody.textContent = 'Could not reach the backend to load this record. Is the server running on ' + api.backendUrl + '?';
+      answerBody.textContent = window.UxHelpers.friendlyError(err, api.backendUrl);
       return;
     }
 
@@ -2170,7 +2194,8 @@
         }
       } catch (err) {
         answerEl.innerHTML = '';
-        setStatus('Ask request failed: ' + (err && err.message ? err.message : String(err)));
+        console.error('[edit] request failed:', err);
+        setStatus(window.UxHelpers.friendlyError(err, api.backendUrl));
       } finally {
         setBusy(false);
       }
@@ -2223,7 +2248,8 @@
         }
       } catch (err) {
         answerEl.innerHTML = '';
-        setStatus('Vision request failed: ' + (err && err.message ? err.message : String(err)));
+        console.error('[edit] request failed:', err);
+        setStatus(window.UxHelpers.friendlyError(err, api.backendUrl));
       } finally {
         setBusy(false);
       }
@@ -2414,7 +2440,8 @@
       } catch (err) {
         if (myGen !== gen) return;
         restoreNodes(answerEl, prevAnswer);
-        setStatus('Vision request failed: ' + (err && err.message ? err.message : String(err)));
+        console.error('[capture] vision request failed:', err);
+        setStatus(window.UxHelpers.friendlyError(err, api.backendUrl));
       } finally {
         if (freshRid === rid) freshRid = null;
         if (myGen === gen) {
@@ -2633,7 +2660,7 @@
       const text = ctxMenu.dataset.sel || '';
       hideCtxMenu();
       if (!text) return;
-      if (action === 'copy') { navigator.clipboard.writeText(text); return; }
+      if (action === 'copy') { copyText(text); return; }
       handleAskSelection({ text, withContext: action === 'ask-context' });
     });
   });
@@ -2707,7 +2734,7 @@
       row.onmouseenter = () => { row.style.background = 'rgba(255,255,255,0.07)'; };
       row.onmouseleave = () => { row.style.background = 'transparent'; };
       row.setAttribute('data-tip', 'Click to copy');
-      row.onclick = () => { navigator.clipboard.writeText(s); };
+      row.onclick = () => { copyText(s, row.firstElementChild); };
       row.innerHTML = `<span style="color:#4c9aff; font-weight:700;">${i + 1}.</span>
         <span style="font-size:14px; line-height:1.45; color:#f2f2f4;">${s.replace(/[<>&]/g, (c)=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[c]))}</span>`;
       suggestionsBox.appendChild(row);
@@ -2763,8 +2790,7 @@
           else if (s === 'disconnected') audioStatus.innerHTML = '<span style="color:#ff3b30;">Transcription disconnected.</span>';
           else if (s === 'connected') audioStatus.textContent = 'Connected. Transcribing.';
           else if (s && s.indexOf('them-failed:') === 0) {
-            audioStatus.innerHTML = '<span style="color:#ffb020;">Capturing "Me" only — system audio ("Them") unavailable: '
-              + s.slice('them-failed:'.length) + '</span>';
+            audioStatus.innerHTML = '<span style="color:#ffb020;">Capturing "Me" only — system audio ("Them") unavailable.</span>';
           }
         },
         autoSuggest: autoSuggestToggle.checked,
@@ -2777,7 +2803,8 @@
       if (wantTranscribe) msg += ' Transcribing (~4s chunks).';
       audioStatus.textContent = msg;
     } catch (e) {
-      audioStatus.innerHTML = '<span style="color:#ff3b30;">Could not start capture: ' + (e && e.message ? e.message : e) + '</span>';
+      console.error('[audio] could not start capture:', e);
+      audioStatus.innerHTML = '<span style="color:#ff3b30;">Could not start capture. Check microphone and audio permissions.</span>';
     }
   });
 
@@ -3014,7 +3041,7 @@
       actions.className = 'qa-actions';
       const copyBtn = document.createElement('button');
       copyBtn.className = 'act-btn'; copyBtn.textContent = '⧉ Copy';
-      copyBtn.addEventListener('click', () => { if (a.textContent) navigator.clipboard.writeText(a.textContent); });
+      copyBtn.addEventListener('click', () => { if (a.textContent) copyText(a.textContent, copyBtn); });
       const expandBtn = document.createElement('button');
       expandBtn.className = 'act-btn'; expandBtn.textContent = 'Expand';
       expandBtn.style.display = 'none';
@@ -3477,14 +3504,15 @@
       try {
         // Window may be shrunk to the small solution panel: bring the full overlay back first.
         if (window.closeSolutionPanel) window.closeSolutionPanel();
-        if (!window.openFreshCapture) { showCaptureError('Internal: the screenshot editor did not load. Reload the overlay.'); return; }
+        if (!window.openFreshCapture) { showCaptureError('The screenshot editor did not load. Reload the overlay.'); return; }
         // Every capture opens the edit screen directly (see initEditModal / capture-flow.js).
         window.openFreshCapture(payload, (m) => setStatus(m, 'idle'));
         const m = document.getElementById('edit-modal');
         const opened = !!(m && m.classList.contains('open'));
         clog('editor ' + (opened ? 'opened' : 'NOT opened (capture was queued or the batch is full; see the status bar)'));
       } catch (err) {
-        showCaptureError('Could not open the screenshot editor: ' + (err && err.message ? err.message : String(err)));
+        console.error('[capture] could not open the screenshot editor:', err);
+        showCaptureError('Could not open the screenshot editor. Please try again.');
       }
     });
     clog('screenshot editor wiring ready');

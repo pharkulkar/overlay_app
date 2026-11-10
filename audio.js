@@ -278,7 +278,8 @@
         // Don't let a failed "Them" capture tear down the whole session —
         // "Me" keeps working. Surface the reason via onStatus if provided.
         state.them.stream = null;
-        if (state.onStatus) state.onStatus('them-failed:' + (err && err.message ? err.message : err));
+        console.error('[audio] system audio (Them) capture failed:', err);
+        if (state.onStatus) state.onStatus('them-failed:');
       }
       state.running = true;
     },

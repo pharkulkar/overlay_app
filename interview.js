@@ -649,7 +649,8 @@
       let stream;
       try { stream = await openInterviewerStream(); }
       catch (err) {
-        emit('onError', { message: 'Could not start listening: ' + (err && err.message ? err.message : String(err)), fatal: true });
+        console.error('[interview] could not start listening:', err);
+        emit('onError', { message: 'Could not start listening. Check screen and audio permissions.', fatal: true });
         throw err;
       }
       state.stream = stream;

@@ -395,6 +395,14 @@ test('UxHelpers: gallery signature stable and sensitive to id/status/answer', ()
   assert.strictEqual(UxHelpers.newestSignature([]), '');
   assert.strictEqual(UxHelpers.newestSignature(a), 'r2|captured|0');
 });
+test('UxHelpers: formatAccelerator is platform-aware', () => {
+  assert.strictEqual(UxHelpers.formatAccelerator('CommandOrControl+Shift+1', true), '⌘⇧1');
+  assert.strictEqual(UxHelpers.formatAccelerator('CommandOrControl+Shift+H', false), 'Ctrl+Shift+H');
+});
+test('UxHelpers: friendlyError hides technical detail', () => {
+  assert.strictEqual(UxHelpers.friendlyError(new TypeError('Failed to fetch'), 'http://localhost:3000'), "Can't reach the backend. Is it running on port 3000?");
+  assert.strictEqual(UxHelpers.friendlyError(new Error('boom backendUrl=x')), 'Something went wrong. Please try again.');
+});
 test('UxHelpers: galleryChanged', () => {
   assert.strictEqual(UxHelpers.galleryChanged('a', 'a'), false);
   assert.strictEqual(UxHelpers.galleryChanged('a', 'b'), true);

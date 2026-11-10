@@ -370,6 +370,14 @@ ipcMain.on('get-vad-config', (event) => {
   };
 });
 
+// Real accelerators (env overrides included) so the overlay's hint strip is accurate.
+ipcMain.on('get-hotkeys', (event) => {
+  event.returnValue = {
+    capture: HOTKEY_CAPTURE_FULL, region: HOTKEY_CAPTURE_REGION,
+    toggle: HOTKEY_TOGGLE_OVERLAY, ask: HOTKEY_ASK_NOW,
+  };
+});
+
 // ── Drag the window from anywhere ────────────────────────────────────────────
 // Electron's native -webkit-app-region drag only covers whatever is NOT marked
 // no-drag, which left only scattered gaps draggable. The renderer now decides
@@ -539,18 +547,17 @@ function registerShortcuts() {
   registerHotkey(HOTKEY_CAPTURE_FULL, () => { console.log('[capture] full-screen hotkey pressed'); triggerFullCapture(); }, 'full-screen capture');
   registerHotkey(HOTKEY_CAPTURE_REGION, () => { console.log('[capture] region hotkey pressed'); triggerRegionCapture(); }, 'region capture');
 
-  globalShortcut.register(HOTKEY_TOGGLE_OVERLAY, () => {
+  registerHotkey(HOTKEY_TOGGLE_OVERLAY, () => {
     if (!overlayWindow) return;
     if (overlayWindow.isVisible()) overlayWindow.hide();
-    else overlayWindow.show();
-  });
+    else { overlayWindow.showInactive(); overlayWindow.moveTop(); }
+  }, 'hide/show');
 
   // Ask-now: tell the overlay to request a suggestion over its open WebSocket.
-  globalShortcut.register(HOTKEY_ASK_NOW, () => {
-    if (overlayWindow && overlayWindow.isVisible === undefined) return;
-    if (overlayWindow && !overlayWindow.isVisible()) overlayWindow.show();
+  registerHotkey(HOTKEY_ASK_NOW, () => {
+    if (overlayWindow && !overlayWindow.isVisible()) { overlayWindow.showInactive(); overlayWindow.moveTop(); }
     sendToOverlay('ask-now', {});
-  });
+  }, 'ask now');
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
@@ -609,8 +616,8 @@ app.whenReady().then(() => {
     overlayWindow.webContents.once('did-finish-load', () => {
       sendToOverlay('capture-error', {
         error: 'Hotkey not available: ' + hotkeyFailures.join(', ')
-          + '. Use the Capture buttons in the Answer tab, or set a different key '
-          + '(HOTKEY_CAPTURE_FULL / HOTKEY_CAPTURE_REGION).',
+          + '. Another app already uses it; set a different key with the matching HOTKEY_* variable '
+          + '(capture can still be used from the buttons in the Answer tab).',
       });
     });
   }

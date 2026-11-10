@@ -18,6 +18,11 @@ try {
   VAD_CONFIG = ipcRenderer.sendSync('get-vad-config') || {};
 } catch (_) { VAD_CONFIG = {}; }
 
+let HOTKEYS = {};
+try {
+  HOTKEYS = ipcRenderer.sendSync('get-hotkeys') || {};
+} catch (_) { HOTKEYS = {}; }
+
 // In-flight cancellable requests, keyed by a caller-supplied string requestId
 // (contextBridge cannot pass an AbortSignal, so the renderer uses ids).
 // LIMITS: aborting the fetch only stops WAITING; it cannot abort the upstream
@@ -58,6 +63,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Interviewer-capture VAD timing overrides (from env; undefined keys keep
   // interview.js defaults).
   vadConfig: VAD_CONFIG,
+  hotkeys: HOTKEYS,
   health: async () => {
     const res = await fetch(`${BACKEND_URL}/api/health`);
     return res.json();
