@@ -26,6 +26,7 @@ const HOTKEY_TOGGLE_OVERLAY = process.env.HOTKEY_TOGGLE_OVERLAY || 'CommandOrCon
 
 let overlayWindow;
 let selectionWindow;
+// Test (demo) mode: overlay is deliberately visible to screen capture. Never persisted; off on every start.
 
 // Capture mode is permanently 'vision' (send image to OpenAI via the popup).
 // [OCR-DISABLED] was: // Capture mode: 'ocr' (default, local OCR) | 'vision' (send image to OpenAI).
@@ -107,8 +108,6 @@ function createOverlayWindow() {
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   // Highest always-on-top priority: stays above full-screen apps.
   overlayWindow.setAlwaysOnTop(true, 'screen-saver');
-  // Hide from screen sharing / recording (Zoom, QuickTime, etc.).
-  overlayWindow.setContentProtection(true);
 
   // Load the local overlay UI (four-state surface).
   overlayWindow.loadFile('index.html');
@@ -134,24 +133,66 @@ async function captureDisplay(display) {
   const physWidth = Math.round(display.bounds.width * scale);
   const physHeight = Math.round(display.bounds.height * scale);
 
-  const sources = await desktopCapturer.getSources({
-    types: ['screen'],
-    thumbnailSize: { width: physWidth, height: physHeight },
-  });
+  const permHint = process.platform === 'darwin'
+    ? ' Allow this app in System Settings > Privacy & Security > Screen Recording, then restart it.'
+    : '';
+  let sources;
+  try {
+    sources = await desktopCapturer.getSources({
+      types: ['screen'],
+      thumbnailSize: { width: physWidth, height: physHeight },
+    });
+  } catch (err) {
+    throw new Error(`Could not read the screen (${err.message || err}).${permHint}`);
+  }
 
   // Match the source to the requested display when possible (multi-monitor).
   let source = sources.find((s) => String(s.display_id) === String(display.id));
   if (!source) source = sources[0];
-  if (!source) throw new Error('No screen source available for capture.');
+  if (!source || source.thumbnail.isEmpty()) {
+    throw new Error('No screen image available for capture.' + permHint);
+  }
 
   return { thumbnail: source.thumbnail, scale, display };
 }
 
+/**
+ * Show the overlay without stealing focus and re-apply its level/workspace
+ * flags: hide() followed by show can reset them (Electron BrowserWindow docs),
+ * and moveTop() alone does not restore the 'screen-saver' level.
+ */
+function showOverlay() {
+  overlayWindow.showInactive();
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  // setVisibleOnAllWorkspaces does nothing on Windows.
+  if (process.platform === 'darwin') {
+    overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
+  overlayWindow.moveTop();
+}
+
+/**
+ * Grab a display with the overlay invisible (the overlay is capturable, so it
+ * must not appear in its own screenshots). Opacity 0 is used instead of hide():
+ * the window keeps its always-on-top level, workspace flags and focus state, so
+ * nothing has to be restored but the opacity. The short wait lets the compositor
+ * drop the overlay and the just-closed region selector from the screen.
+ */
+async function captureDisplayWithoutOverlay(display) {
+  const win = overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible() ? overlayWindow : null;
+  if (win) win.setOpacity(0);
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return await captureDisplay(display);
+  } finally {
+    if (win && !win.isDestroyed()) win.setOpacity(1);
+  }
+}
 /** Full-screen capture on the display under the cursor. */
 async function captureFullScreen() {
   const point = screen.getCursorScreenPoint();
   const display = screen.getDisplayNearestPoint(point);
-  const { thumbnail } = await captureDisplay(display);
+  const { thumbnail } = await captureDisplayWithoutOverlay(display);
   const dataUrl = thumbnail.toDataURL();
   await routeCapture(dataUrl, 'screenshot-full');
 }
@@ -161,7 +202,7 @@ async function captureFullScreen() {
  * rect is in LOGICAL (CSS) pixels relative to the display's top-left.
  */
 async function captureRegion(display, rect) {
-  const { thumbnail, scale } = await captureDisplay(display);
+  const { thumbnail, scale } = await captureDisplayWithoutOverlay(display);
 
   // Convert logical selection rect -> physical pixels for cropping.
   const cropRect = {
@@ -199,9 +240,7 @@ function openRegionSelector() {
     hasShadow: false,
     enableLargerThanScreen: true,
     skipTaskbar: true,
-    // Create hidden so content protection is in force BEFORE the first paint;
-    // showing a transparent window before protection applies can leak it into
-    // screen-share for a frame or more.
+    // Create hidden and reveal on ready-to-show to avoid a blank first frame.
     show: false,
     paintWhenInitiallyHidden: true,
     webPreferences: {
@@ -211,19 +250,17 @@ function openRegionSelector() {
     },
   });
 
-  // Apply protection + levels while still hidden.
+  // Apply levels while still hidden.
   lockNavigation(selectionWindow);
-  selectionWindow.setContentProtection(true);
   selectionWindow.setAlwaysOnTop(true, 'screen-saver');
   selectionWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   // Remember which display we're selecting on for the crop step.
   selectionWindow._targetDisplay = display;
 
-  // Only reveal once the page is ready AND protection is set.
+  // Only reveal once the page is ready.
   selectionWindow.once('ready-to-show', () => {
     if (!selectionWindow) return;
-    selectionWindow.setContentProtection(true); // re-assert, belt-and-suspenders
     selectionWindow.showInactive();
     selectionWindow.focus();
   });
@@ -274,8 +311,7 @@ function deliverVisionCapture(dataUrl, sourceType) {
   // raises it without stealing keyboard focus from the meeting app (the
   // editor's own focus handling takes over once the user clicks into it).
   if (overlayWindow.isMinimized()) overlayWindow.restore();
-  if (!overlayWindow.isVisible()) overlayWindow.showInactive();
-  overlayWindow.moveTop();
+  showOverlay();
   console.log(`[capture] delivering ${sourceType} (${Math.round(dataUrl.length / 1024)} KB) to the overlay`);
   sendToOverlay('vision-capture', { dataUrl, sourceType });
 }
@@ -494,10 +530,8 @@ ipcMain.on('set-compact-mode', (event, on) => {
 // [OCR-DISABLED]   if (mode === 'ocr' || mode === 'vision') captureMode = mode;
 // [OCR-DISABLED] });
 // NOTE: the transcript "Ask" menu is now drawn as an in-overlay HTML menu
-// inside the content-protected overlay window (see index.html). A native
-// Electron Menu.popup() renders in an OS surface that is NOT covered by
-// setContentProtection, so it would be visible during screen sharing — hence
-// we no longer use a native menu here.
+// inside the overlay window (see index.html), so we no longer use a native
+// Menu.popup() here.
 
 // ── Global shortcuts ─────────────────────────────────────────────────────────
 
@@ -552,7 +586,7 @@ function registerShortcuts() {
   registerHotkey(HOTKEY_TOGGLE_OVERLAY, () => {
     if (!overlayWindow) return;
     if (overlayWindow.isVisible()) overlayWindow.hide();
-    else { overlayWindow.showInactive(); overlayWindow.moveTop(); }
+    else showOverlay();
   }, 'hide/show');
 
   // [AUDIO-TAB-DISABLED] Ask-now: tell the overlay to request a suggestion over its open WebSocket.

@@ -1,7 +1,7 @@
 # Overlay App — Feature List
 
 An Electron desktop **overlay assistant** that floats on top of everything, stays
-hidden from screen sharing, and helps answer on-screen questions and live
+visible in screen sharing and recording, and helps answer on-screen questions and live
 interview/meeting questions. The Electron app is the frontend; it talks to a
 separate Python backend (expected at `http://localhost:3000`) for OCR, OpenAI
 answers, and speech-to-text.
@@ -12,9 +12,8 @@ answers, and speech-to-text.
 
 - **Frameless, transparent, always-on-top window** — a translucent "glass" card
   that floats over all other apps.
-- **Hidden from screen sharing / recording** — `setContentProtection(true)` keeps
-  the overlay (and its region selector) invisible to Zoom, QuickTime, and other
-  capture tools.
+- **Visible in screen sharing / recording** — no content protection is applied;
+  the overlay is hidden only while the app grabs a screenshot.
 - **Pinned across all desktops / spaces** — visible on every virtual desktop and
   even over full-screen apps (`screen-saver` always-on-top level).
 - **Draggable** anywhere on screen; interactive controls opt out of dragging so
@@ -23,7 +22,7 @@ answers, and speech-to-text.
   a JSON file in the app's userData folder).
 - **Show/hide toggle** via global hotkey.
 - **In-overlay right-click menu** instead of a native OS menu, so the menu itself
-  stays inside the content-protected window (never leaks on screen share).
+  stays inside the overlay window.
 
 ## 2. Global hotkeys (configurable via env vars)
 
@@ -123,7 +122,7 @@ A dual-stream meeting copilot focused on a live transcript you can act on.
   audio; dismissal remembered in `localStorage`.
 - **Transcript kept in memory by default** — only written to disk if you explicitly
   choose Save.
-- **Content protection** so the overlay never appears in shared/recorded screens.
+- **Overlay visible** in shared/recorded screens (no content protection).
 - **Sandboxed renderer** — `contextIsolation` on, `nodeIntegration` off; the
   renderer reaches the backend only through a narrow `preload.js` bridge.
 

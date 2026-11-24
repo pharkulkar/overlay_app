@@ -643,7 +643,6 @@
       <button type="button" class="seg-btn" id="op-solid" data-op="solid" aria-pressed="false" data-tip="Solid: opaque background">Solid</button>
     </div>
   </div>
-
   <!-- S1: Answer -->
   <div class="view hidden" id="view-answer" role="tabpanel" aria-labelledby="nav-answer">
     <!-- Question box: type a question -> Ask -->
@@ -1701,8 +1700,7 @@
   // Small solution panel. "Pop out solution" shrinks the whole window into a
   // small always-on-top panel showing just the solution (code in monospace
   // boxes), so it can be read while typing it elsewhere. "⤢ Full overlay"
-  // restores everything exactly as it was. Same window + same content
-  // protection, so it stays hidden from screen sharing.
+  // restores everything exactly as it was. Same window.
   // ══════════════════════════════════════════════════════════════════════
   (function initSolutionPanel() {
     const view = document.getElementById('compact-view');
@@ -1788,7 +1786,7 @@
   })();
 
   // On-screen capture buttons: same paths as the capture hotkeys; both open
-  // the edit screen directly. The overlay is content-protected, so it is not captured.
+  // the edit screen directly. Main hides the overlay while grabbing the screen.
   ['full', 'region'].forEach((kind) => {
     const btn = document.getElementById('btn-capture-' + kind);
     if (!btn) return;
@@ -2068,8 +2066,7 @@
 
   // ══════════════════════════════════════════════════════════════════════
   // Gallery edit modal — image editor (draw/crop) + vision button + answer, or a text
-  // editor (+ answer) for manual/audio records. Lives inside this content-
-  // protected overlay window, so it stays hidden from screen sharing.
+  // editor (+ answer) for manual/audio records. Lives inside this overlay window.
   // ══════════════════════════════════════════════════════════════════════
   (function initEditModal() {
     const modal = document.getElementById('edit-modal');

@@ -211,19 +211,9 @@ function runAudit(files) {
   const winNames = [];
   while ((wm = winRe.exec(main))) winNames.push({ name: wm[1], index: wm.index });
   if (!winNames.length) add('main.js', 'windows', 'no BrowserWindow found');
-  winNames.forEach((w) => {
-    if (!new RegExp('\\b' + w.name + '\\s*\\.\\s*setContentProtection\\s*\\(\\s*true\\s*\\)').test(main)) {
-      add('main.js', 'content-protection', w.name + ' is a BrowserWindow without setContentProtection(true)');
-    }
-  });
   if ((main.match(/new\s+BrowserWindow\s*\(/g) || []).length !== winNames.length) {
     add('main.js', 'windows', 'a BrowserWindow is created without being assigned to a named variable');
   }
-  ['overlayWindow', 'selectionWindow'].forEach((nm) => {
-    if (!new RegExp('\\b' + nm + '\\s*\\.\\s*setContentProtection\\s*\\(\\s*true\\s*\\)').test(main)) {
-      add('main.js', 'content-protection', nm + '.setContentProtection(true) is missing');
-    }
-  });
   const ov = winNames.find((w) => w.name === 'overlayWindow');
   if (ov) {
     const opts = main.slice(ov.index, main.indexOf('});', ov.index));
@@ -420,7 +410,6 @@ test('comment stripping keeps live tokens and drops commented-out code', () => {
   assert.ok(!/confirm\('x'\)/.test(js) && !/alert/.test(js));
   assert.ok(/confirm2/.test(js));
   const main = stripJs(real.mainJs, false);
-  assert.ok(/setContentProtection\(true\)/.test(main));
   assert.ok(!/\/\/ \[OCR-DISABLED\]/.test(main));
   const idx = splitHtml(real.indexHtml);
   assert.ok(/id="overlay-card"/.test(idx.markup));
@@ -461,12 +450,12 @@ test('self-test: confirm( / alert( / prompt( are reported; overlayConfirm( and c
   assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('const api = window.electronAPI || {};', 'const api = window.electronAPI || {}; window.confirm("x");'); })).includes('native-dialog'));
   assert.deepStrictEqual(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('const api = window.electronAPI || {};', 'const api = window.electronAPI || {}; // confirm("x")\n overlayConfirm("x");'); })), []);
 });
-test('self-test: resizable:true, setResizable(true) and a missing setContentProtection are reported', () => {
+test('overlay content protection is never enabled (overlay is visible to capture)', () => {
+  assert.ok(!/setContentProtection/.test(stripJs(real.mainJs, false)));
+});
+test('self-test: resizable:true and setResizable(true) are reported', () => {
   assert.ok(rules(mutate((f) => { f.mainJs = f.mainJs.replace('resizable: false,\n    hasShadow', 'resizable: true,\n    hasShadow'); })).includes('resizable-true'));
-  assert.ok(rules(mutate((f) => { f.mainJs = f.mainJs.replace('overlayWindow.setContentProtection(true);', ''); })).includes('content-protection'));
-  assert.ok(rules(mutate((f) => { f.mainJs = f.mainJs.replace(/selectionWindow\.setContentProtection\(true\);/g, ''); })).includes('content-protection'));
   assert.ok(rules(mutate((f) => { f.mainJs += '\noverlayWindow.setResizable(true);\n'; })).includes('resizable-true'));
-  assert.ok(rules(mutate((f) => { f.mainJs += '\nconst w3 = new BrowserWindow({});\n'; })).includes('content-protection'));
 });
 test('self-test: <a href>, window.open, extra file input, datalist and native pickers are reported', () => {
   assert.ok(rules(mutate((f) => { f.indexHtml = f.indexHtml.replace('<body>', '<body><a href="https://x.test">x</a>'); })).includes('anchor-href'));
