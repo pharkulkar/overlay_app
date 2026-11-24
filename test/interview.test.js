@@ -341,9 +341,11 @@ test('vision: buildVisionRequest keeps order, mode and source types', () => {
   assert.strictEqual(req.mode, 'scenario');
 });
 test('vision: mode normalizers default safely', () => {
-  assert.strictEqual(VisionBatch.normalizeMode(undefined), 'coding');
-  assert.strictEqual(VisionBatch.normalizeMode('bogus'), 'coding');
+  assert.strictEqual(VisionBatch.normalizeMode(undefined), 'generic');
+  assert.strictEqual(VisionBatch.normalizeMode('bogus'), 'generic');
+  assert.strictEqual(VisionBatch.normalizeMode('coding'), 'coding');
   assert.strictEqual(VisionBatch.normalizeMode('scenario'), 'scenario');
+  assert.strictEqual(VisionBatch.normalizeMode('generic'), 'generic');
   assert.strictEqual(VisionBatch.normalizeCaptureMode(undefined), 'ocr');
   assert.strictEqual(VisionBatch.normalizeCaptureMode('bogus'), 'ocr');
   assert.strictEqual(VisionBatch.normalizeCaptureMode('vision'), 'vision');
@@ -572,7 +574,8 @@ test('CaptureFlow: markSent clears staged, keeps current and fresh mode', () => 
 });
 test('CaptureFlow: normalizeLastMode', () => {
   assert.strictEqual(CF.normalizeLastMode('scenario'), 'scenario');
-  ['coding', '', null, undefined, 'x', 5].forEach((v) => assert.strictEqual(CF.normalizeLastMode(v), 'coding'));
+  assert.strictEqual(CF.normalizeLastMode('coding'), 'coding');
+  ['generic', '', null, undefined, 'x', 5].forEach((v) => assert.strictEqual(CF.normalizeLastMode(v), 'generic'));
 });
 test('CaptureFlow: labels', () => {
   assert.strictEqual(CF.sendLabel(1), 'Get solution from image');

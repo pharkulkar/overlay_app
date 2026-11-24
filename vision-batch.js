@@ -25,7 +25,7 @@
 
   function removeImage(batch, id) { return batch.filter((b) => b.id !== id); }
 
-  function normalizeMode(m) { return m === 'scenario' ? 'scenario' : 'coding'; }
+  function normalizeMode(m) { return (m === 'coding' || m === 'scenario') ? m : 'generic'; }
   function normalizeCaptureMode(m) { return m === 'vision' ? 'vision' : 'ocr'; }
 
   function buildVisionRequest(batch, mode) {

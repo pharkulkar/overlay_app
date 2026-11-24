@@ -838,8 +838,11 @@
         <!-- Send the image (as it is now, edited or not) straight to OpenAI vision. -->
         <div id="edit-vision-box" class="edit-bar">
           <div class="actions">
+            <label for="edit-vm-generic" data-tip="Any other question: MCQ, aptitude, maths, reasoning, theory, general knowledge, form or text" style="font-size:12px; display:flex; align-items:center; gap:5px;">
+              <input type="radio" name="edit-vision-mode" id="edit-vm-generic" value="generic" checked> Generic solution
+            </label>
             <label for="edit-vm-coding" style="font-size:12px; display:flex; align-items:center; gap:5px;">
-              <input type="radio" name="edit-vision-mode" id="edit-vm-coding" value="coding" checked> Coding solution
+              <input type="radio" name="edit-vision-mode" id="edit-vm-coding" value="coding"> Coding solution
             </label>
             <label for="edit-vm-scenario" style="font-size:12px; display:flex; align-items:center; gap:5px;">
               <input type="radio" name="edit-vision-mode" id="edit-vm-scenario" value="scenario"> Scenario-based solution
@@ -2349,7 +2352,7 @@
       if (!api.visionAsk) { setStatus('Vision bridge unavailable.'); return; }
       if (!canvas.width || !canvas.height) { setStatus('No image to send.'); return; }
       const modeEl = document.querySelector('input[name="edit-vision-mode"]:checked');
-      const mode = modeEl ? modeEl.value : 'coding';
+      const mode = modeEl ? modeEl.value : 'generic';
       const rid = genRequestId('vis');
       const prevAnswer = Array.from(answerEl.childNodes);
       setStatus('Sending image to OpenAI…');
@@ -2392,7 +2395,7 @@
       try { localStorage.setItem(CF.STORAGE_KEY, CF.normalizeLastMode(m)); } catch (_) {}
     }
     function selectedMode() {
-      let v = 'coding';
+      let v = 'generic';
       visionRadios.forEach((r) => { if (r.checked) v = r.value; });
       return CF.normalizeLastMode(v);
     }
@@ -2606,7 +2609,7 @@
       canvasReady = false;
       resetFreshUi();
       if (wasFreshBusy) setBusy(false);
-      visionRadios.forEach((r) => { r.checked = (r.value === 'coding'); });
+      visionRadios.forEach((r) => { r.checked = (r.value === 'generic'); });
       editRecordId = id;
       editSourceType = sourceType;
       sourceExtractedText = '';
